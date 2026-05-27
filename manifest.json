@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Color Theme Picker",
+  "version": "1.0",
+  "description": "Pick theme colors and generate Tailwind CSS variables for light and dark modes.",
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": "icons/icon.png"
+  },
+  "icons": {
+    "128": "icons/icon.png"
+  },
+  "permissions": ["storage", "clipboardWrite", "activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/content/inject.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
