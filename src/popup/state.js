@@ -6,6 +6,11 @@ const views = {
     error: document.getElementById('error-display')
 };
 
+const errorEls = {
+    text: document.getElementById('error-text'),
+    dismiss: document.getElementById('error-dismiss')
+};
+
 const keyListEls = {
     section: document.getElementById('key-list-section'),
     list: document.getElementById('key-list')

@@ -52,11 +52,38 @@ const buildKeyRow = (item, isActive) => {
         actions.appendChild(activate);
     }
 
+    // Deleting used to be one unconfirmed click, and a stored key cannot be
+    // read back out of the UI to recover it. The button arms itself first and
+    // disarms again after a few seconds.
     const remove = document.createElement('button');
     remove.className = 'key-action-btn delete';
     remove.title = 'Delete Key';
+    remove.setAttribute('aria-label', `Delete key ${item.name || 'Unnamed Key'}`);
     remove.innerHTML = ICONS.trash;
-    remove.onclick = () => deleteKey(item.key);
+
+    let disarmTimer = null;
+    const disarm = () => {
+        clearTimeout(disarmTimer);
+        remove.classList.remove('armed');
+        delete remove.dataset.armed;
+        remove.innerHTML = ICONS.trash;
+        remove.title = 'Delete Key';
+    };
+
+    remove.onclick = () => {
+        if (remove.dataset.armed === '1') {
+            disarm();
+            deleteKey(item.key);
+            return;
+        }
+
+        remove.dataset.armed = '1';
+        remove.classList.add('armed');
+        remove.textContent = 'Confirm';
+        remove.title = 'Click again to delete this key';
+        disarmTimer = setTimeout(disarm, 4000);
+    };
+
     actions.appendChild(remove);
 
     row.append(info, actions);

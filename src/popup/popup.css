@@ -846,3 +846,80 @@ code { font-size: 0.65rem; color: var(--muted); background: var(--bg); padding: 
   color: var(--fg);
   border-color: var(--muted);
 }
+
+/* The dropdown trigger is a <button> now, for keyboard and screen-reader
+   support; these reset the UA button defaults it picked up. */
+.dropdown-header {
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  appearance: none;
+}
+
+.dropdown-header:focus-visible,
+.option:focus-visible,
+.error-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.option:focus {
+  background: var(--accent-soft);
+}
+
+/* Message strip: dismissed by the user rather than by a timer. */
+.error-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.error-strip.hidden {
+  display: none;
+}
+
+#error-text {
+  flex: 1;
+}
+
+.error-dismiss {
+  flex-shrink: 0;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: none;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.error-dismiss:hover {
+  opacity: 1;
+}
+
+/* A colour the browser cannot parse, so the swatch says so instead of
+   rendering as an empty box. */
+.swatch-invalid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Delete needs a second click to confirm. */
+.key-action-btn.armed {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}

@@ -251,19 +251,19 @@ when `dist/` is stale.
 
 > **Goal:** make the popup usable by keyboard and screen reader, and stop it losing user data.
 
-- [ ] 🟠 **Make the format dropdown accessible.** `src/popup/popup.html:82-97` builds it entirely from
+- [x] 🟠 **Make the format dropdown accessible.** `src/popup/popup.html:82-97` builds it entirely from
       `<div>`s with no `role`, `aria-expanded`, `aria-selected`, or `tabindex`, and
       `src/popup/ui.js:129-160` binds only `onclick`. It is unreachable by keyboard and invisible to
       screen readers. Either add full listbox semantics with arrow-key handling, or replace it with a
       styled native `<select>`.
-- [ ] 🟠 **Confirm before deleting a key.** `src/popup/api-keys.js:33` wires delete directly to a
+- [x] 🟠 **Confirm before deleting a key.** `src/popup/api-keys.js:33` wires delete directly to a
       single click with no confirmation, and `deleteKey` at `:48` removes it immediately. One misclick
       loses a key permanently, and there is no way to view a stored key to recover it.
-- [ ] 🟡 **Announce errors, and stop hiding them.** `#error-display` (`src/popup/popup.html:177`) has
+- [x] 🟡 **Announce errors, and stop hiding them.** `#error-display` (`src/popup/popup.html:177`) has
       no `role="alert"`, so screen readers never announce it. The 4-second and 6-second auto-hide
       timers at `src/popup/ui.js:44` and `:84` also dismiss messages mid-read. Add the role and
       replace the timers with a manual dismiss.
-- [ ] 🟡 **Manage focus across views.** `showView` (`src/popup/ui.js:5-30`) toggles a `.hidden` class
+- [x] 🟡 **Manage focus across views.** `showView` (`src/popup/ui.js:5-30`) toggles a `.hidden` class
       and never moves focus, so keyboard focus is left on an element in a now-hidden view.
 - [x] 🟡 **Don't discard a renamed key.** `src/popup/api-keys.js:71-73` skips the `push` when the key
       value already exists, silently throwing away the newly typed name. Update the existing entry's
@@ -271,11 +271,11 @@ when `dist/` is stale.
 - [x] 🟢 **Fix key masking for short input.** `src/popup/api-keys.js:12` builds
       `key.slice(0, 6) + '...' + key.slice(-4)`. For a key under 10 characters the two slices overlap
       and characters are duplicated. Guard on length.
-- [ ] 🟢 **Mark unrenderable swatches.** `src/popup/ui.js:115` assigns the model's raw value to
+- [x] 🟢 **Mark unrenderable swatches.** `src/popup/ui.js:115` assigns the model's raw value to
       `box.style.backgroundColor`. An invalid value is silently dropped by the browser, leaving a blank
       box with no explanation. Validate with `CSS.supports` and flag failures — this is also the
       clearest signal that the alpha-syntax bug from Phase 2 has regressed.
-- [ ] 🟢 **Fix copy indentation.** `src/popup/init.js:32-34` wraps the theme body in
+- [x] 🟢 **Fix copy indentation.** `src/popup/init.js:32-34` wraps the theme body in
       `` `:root {\n  ${themes.light}\n}` ``, indenting only the first line; every subsequent line lands
       flush left. Re-indent each line.
 

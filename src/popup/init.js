@@ -1,3 +1,15 @@
+// Re-indents every declaration, not just the first. The old template literal
+// put two spaces before the opening line and left the rest flush left.
+const wrapCssBlock = (selector, body) => {
+    const lines = body
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => `  ${line}`);
+
+    return `${selector} {\n${lines.join('\n')}\n}`;
+};
+
 const isMacPlatform = () => /mac|iphone|ipad/i.test(
     (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent
 );
@@ -15,6 +27,7 @@ const applyShortcutLabels = () => {
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize component logic
     applyShortcutLabels();
+    initMessageDismiss();
     initDropdown();
     initApiKeyListeners();
     initGeneratorListeners();
@@ -43,9 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Success View: Copy handlers
-    results.copyLight.onclick = () => copyToClipboard(`:root {\n  ${themes.light}\n}`, results.copyLight);
-    results.copyDark.onclick = () => copyToClipboard(`.dark {\n  ${themes.dark}\n}`, results.copyDark);
-    results.copyFull.onclick = () => copyToClipboard(`:root {\n  ${themes.light}\n}\n\n.dark {\n  ${themes.dark}\n}`, results.copyFull);
+    results.copyLight.onclick = () => copyToClipboard(wrapCssBlock(':root', themes.light), results.copyLight);
+    results.copyDark.onclick = () => copyToClipboard(wrapCssBlock('.dark', themes.dark), results.copyDark);
+    results.copyFull.onclick = () => copyToClipboard(
+        `${wrapCssBlock(':root', themes.light)}\n\n${wrapCssBlock('.dark', themes.dark)}`,
+        results.copyFull
+    );
 
     // Show errors in the UI instead of letting them break the popup silently.
     // The handler deliberately does NOT return true: returning true cancels the
