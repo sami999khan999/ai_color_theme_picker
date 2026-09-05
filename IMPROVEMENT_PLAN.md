@@ -288,23 +288,23 @@ no single click can destroy a saved key.
 
 > **Goal:** build on the now-stable base. Ordered by value to the target user.
 
-- [ ] 🟠 **Persist user settings.** `selectedFormatValue` (`src/popup/state.js:46`) is a module global
+- [x] 🟠 **Persist user settings.** `selectedFormatValue` (`src/popup/state.js:46`) is a module global
       initialized to `'oklch'` on every popup open, and the prompt and last result are equally
       ephemeral — closing the popup loses everything. This directly contradicts `README.md:69`, which
       tells users to "Change the Color Format ... for the next generation". Persist format, last
       prompt, and last theme to `chrome.storage.local` and restore them on open.
-- [ ] 🟠 **Validate contrast.** Compute WCAG AA contrast ratios for each generated
+- [x] 🟠 **Validate contrast.** Compute WCAG AA contrast ratios for each generated
       foreground/background pair and flag failures in the result view. The model is not reliable at
       this, and it is the single most valuable addition for the developer/designer audience — an
       inaccessible theme is a broken theme.
-- [ ] 🟡 **Theme history.** Store the last N generated themes with their source site and let the user
+- [x] 🟡 **Theme history.** Store the last N generated themes with their source site and let the user
       reopen them. Cheap to build once persistence exists.
-- [ ] 🟡 **Live preview.** Inject the generated variables into the active tab behind a toggle so the
+- [x] 🟡 **Live preview.** Inject the generated variables into the active tab behind a toggle so the
       user sees the theme applied before copying, then revert cleanly on close.
-- [ ] 🟡 **More export formats.** A Tailwind v4 `@theme` block, and a JSON export.
-- [ ] 🟢 **Model selection.** `gemini-2.5-flash` is hard-coded at `src/popup/generator.js:171`. Let the
+- [x] 🟡 **More export formats.** A Tailwind v4 `@theme` block, and a JSON export.
+- [x] 🟢 **Model selection.** `gemini-2.5-flash` is hard-coded at `src/popup/generator.js:171`. Let the
       user choose, and default to the current flash model.
-- [ ] 🟢 **Regenerate with the same prompt** from the result view, for quick iteration.
+- [x] 🟢 **Regenerate with the same prompt** from the result view, for quick iteration.
 
 **Exit criteria:** settings survive a popup close; generated themes carry a pass/fail contrast report.
 

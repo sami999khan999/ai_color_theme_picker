@@ -18,6 +18,7 @@ const browserGlobals = {
     AbortController: 'readonly',
     DOMException: 'readonly',
     CSS: 'readonly',
+    URL: 'readonly',
     chrome: 'readonly',
 };
 

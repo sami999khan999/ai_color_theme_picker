@@ -16,6 +16,11 @@ const keyListEls = {
     list: document.getElementById('key-list')
 };
 
+const historyEls = {
+    section: document.getElementById('history-section'),
+    list: document.getElementById('history-list')
+};
+
 const controls = {
     apiKeyName: document.getElementById('api-key-name'),
     apiKey: document.getElementById('api-key'),
@@ -31,6 +36,9 @@ const controls = {
     generatingPreview: document.getElementById('generating-preview'),
     liveCodeStream: document.getElementById('live-code-stream'),
     cancelGenerate: document.getElementById('cancel-generate'),
+    modelSelect: document.getElementById('model-select'),
+    previewToggle: document.getElementById('preview-toggle'),
+    previewToggleLabel: document.getElementById('preview-toggle-label'),
     shortcutHint: document.getElementById('shortcut-hint'),
     shortcutKbd: document.getElementById('shortcut-kbd'),
 };
@@ -47,11 +55,18 @@ const results = {
     copyLight: document.getElementById('copy-light'),
     copyDark: document.getElementById('copy-dark'),
     copyFull: document.getElementById('copy-full'),
+    copyTailwind: document.getElementById('copy-tailwind'),
+    copyJson: document.getElementById('copy-json'),
+    contrastSummary: document.getElementById('contrast-summary'),
+    contrastList: document.getElementById('contrast-list'),
     lightPalette: document.getElementById('light-palette'),
     darkPalette: document.getElementById('dark-palette')
 };
 
 let selectedFormatValue = 'oklch';
+let selectedModel = 'gemini-2.5-flash';
+let themeHistory = [];
+let previewTabId = null;
 let geminiApiKey = '';
 let apiKeys = [];
 const themes = { light: '', dark: '' };

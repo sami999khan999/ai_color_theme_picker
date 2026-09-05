@@ -1,3 +1,37 @@
+// Puts the stored format, model, prompt and history back in place. Only the API
+// keys used to survive a popup close.
+const restorePreferences = (stored) => {
+    if (stored[STORAGE_KEYS.format]) {
+        selectedFormatValue = stored[STORAGE_KEYS.format];
+        const option = customDropdown.items.find(
+            item => item.getAttribute('data-value') === selectedFormatValue
+        );
+        if (option) {
+            customDropdown.label.textContent = option.textContent;
+            customDropdown.items.forEach((opt) => {
+                const isSelected = opt === option;
+                opt.classList.toggle('active', isSelected);
+                opt.setAttribute('aria-selected', String(isSelected));
+            });
+        }
+    }
+
+    selectedModel = stored[STORAGE_KEYS.model] || DEFAULT_MODEL;
+    if (controls.modelSelect) controls.modelSelect.value = selectedModel;
+
+    if (stored[STORAGE_KEYS.prompt] && controls.userPrompt) {
+        controls.userPrompt.value = stored[STORAGE_KEYS.prompt];
+    }
+
+    themeHistory = Array.isArray(stored[STORAGE_KEYS.history]) ? stored[STORAGE_KEYS.history] : [];
+
+    const last = stored[STORAGE_KEYS.lastTheme];
+    if (last && last.light && last.dark) {
+        themes.light = last.light;
+        themes.dark = last.dark;
+    }
+};
+
 // Re-indents every declaration, not just the first. The old template literal
 // put two spaces before the opening line and left the rest flush left.
 const wrapCssBlock = (selector, body) => {
@@ -32,8 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initApiKeyListeners();
     initGeneratorListeners();
 
-    // Load API Keys and perform initial scan
-    chrome.storage.local.get(['geminiApiKey', 'apiKeys'], (result) => {
+    if (controls.modelSelect) {
+        controls.modelSelect.onchange = () => {
+            selectedModel = controls.modelSelect.value;
+            persistPreferences();
+        };
+    }
+
+    // Load stored keys, preferences and history.
+    chrome.storage.local.get(Object.values(STORAGE_KEYS), (result) => {
         const rawKeys = result.apiKeys || [];
         // Migration: Convert string keys to objects if necessary
         apiKeys = rawKeys.map(k => {
@@ -42,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }).filter(k => k !== null);
         
+        restorePreferences(result);
+
         if (result.geminiApiKey) {
             geminiApiKey = result.geminiApiKey;
             if (!apiKeys.some(k => k.key === geminiApiKey)) {
@@ -53,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showView('setup');
         }
         renderKeyList();
+        renderHistory();
     });
 
     // Success View: Copy handlers
@@ -62,6 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
         `${wrapCssBlock(':root', themes.light)}\n\n${wrapCssBlock('.dark', themes.dark)}`,
         results.copyFull
     );
+
+    if (results.copyTailwind) {
+        results.copyTailwind.onclick = () =>
+            copyToClipboard(toTailwindTheme(themes.light), results.copyTailwind);
+    }
+
+    if (results.copyJson) {
+        results.copyJson.onclick = () =>
+            copyToClipboard(toThemeJson(themes.light, themes.dark), results.copyJson);
+    }
 
     // Show errors in the UI instead of letting them break the popup silently.
     // The handler deliberately does NOT return true: returning true cancels the

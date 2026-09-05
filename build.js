@@ -22,8 +22,10 @@ const OUTPUT_FILE = path.join(DIST_DIR, 'popup.js');
 // Files in dependency order
 const JS_FILES = [
     'shared/icons.js',
+    'shared/color.js',
     'shared/utils.js',
     'popup/state.js',
+    'popup/storage.js',
     'popup/ui.js',
     'popup/api-keys.js',
     'popup/generator.js',

@@ -219,3 +219,31 @@ test('extractColorsFunc keeps the page scan cheap', async (t) => {
         assert.ok(exports.extractColorsFunc().palette.includes('#123456'));
     });
 });
+
+test('export helpers reshape the theme for other toolchains', async (t) => {
+    const { exports: exporters } = loadScript('shared/utils.js', ['toTailwindTheme', 'toThemeJson'], {
+        // utils.js uses parseCssVariables from color.js, which shares the bundle's
+        // global scope; the sandbox stands in for that.
+        parseCssVariables: (body) => {
+            const vars = {};
+            const regex = /(--[\w-]+):\s*([^;]+);/g;
+            let match;
+            while ((match = regex.exec(body)) !== null) vars[match[1]] = match[2].trim();
+            return vars;
+        },
+    });
+
+    await t.test('emits Tailwind v4 --color-* tokens pointing at the originals', () => {
+        const out = exporters.toTailwindTheme('--background: white; --primary: blue; --radius: 0.5rem;');
+        assert.match(out, /^@theme inline \{/);
+        assert.match(out, /--color-background: var\(--background\);/);
+        assert.match(out, /--color-primary: var\(--primary\);/);
+        // --radius is a length, not a colour.
+        assert.doesNotMatch(out, /--color-radius/);
+    });
+
+    await t.test('emits both modes as JSON', () => {
+        const json = JSON.parse(exporters.toThemeJson('--a: red;', '--a: black;'));
+        assert.deepEqual(json, { light: { '--a': 'red' }, dark: { '--a': 'black' } });
+    });
+});

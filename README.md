@@ -15,17 +15,28 @@ shadcn-ui CSS variables for both light and dark mode.
 - Generates output in **OKLCH**, HEX, RGB, HSL, or LCH.
 
 ### AI theme generation
-- Uses Google's **`gemini-2.5-flash`** model.
+- Uses Google's Gemini — **`gemini-2.5-flash`** by default, switchable to Pro or
+  Flash-Lite in settings.
 - Takes an optional style prompt ("Sleek SaaS dashboard with slate tones",
   "Vibrant cyberpunk neon") which is prioritised over the scraped palette.
 - Streams the response so you can watch the CSS being written, and can be
   cancelled mid-generation.
 
+### Accessibility checking
+- Every foreground/background pair in the generated theme is measured against
+  **WCAG AA**, in both light and dark mode, with failures listed first. The model
+  is not reliable at contrast, and an inaccessible theme is a broken theme.
+
+### Live preview
+- Apply the generated theme to the page you are on before you copy it, and
+  revert it with the same button.
+
 ### Tailwind and shadcn/ui ready
 - Emits the full shadcn variable set — `--background`, `--primary`, `--accent`,
   `--muted`, `--chart-1..5`, `--sidebar-*` and the rest.
 - Produces both a `:root` (light) and a `.dark` block.
-- Copy either block on its own, or export the whole thing.
+- Copy either block on its own, export the whole thing, or export as a
+  Tailwind v4 `@theme inline` block or JSON.
 
 ### Key management
 - Store several Gemini API keys under names like "Personal" or "Work" and switch
@@ -104,7 +115,9 @@ Open the popup and click the gear icon to:
 - Add, switch between, or delete **Gemini API keys**.
 - Return to the generator.
 
-In the generator you can set a style prompt and pick the **colour format**.
+In the generator you can set a style prompt and pick the **colour format**. Your
+prompt, format, model and most recent theme are remembered between sessions, and
+the last five themes are listed under **Recent Themes** for one-click restore.
 
 ---
 

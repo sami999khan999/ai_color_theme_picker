@@ -126,6 +126,139 @@ const renderPalette = (cssString, container) => {
     }
 };
 
+// One canvas, reused, to turn any CSS colour the browser understands into RGB.
+// CSS.supports filters out values that are not colours at all, so an
+// unparseable value is reported rather than silently scored.
+const createColorParser = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const cache = new Map();
+
+    return (value) => {
+        const key = String(value || '').trim();
+        if (!key) return null;
+        if (cache.has(key)) return cache.get(key);
+
+        let rgb = null;
+        const supported = typeof CSS !== 'undefined' && CSS.supports
+            ? CSS.supports('color', key)
+            : true;
+
+        if (ctx && supported) {
+            try {
+                ctx.fillStyle = key;
+                ctx.fillRect(0, 0, 1, 1);
+                const data = ctx.getImageData(0, 0, 1, 1).data;
+                rgb = [data[0], data[1], data[2]];
+            } catch {
+                rgb = null;
+            }
+        }
+
+        cache.set(key, rgb);
+        return rgb;
+    };
+};
+
+// The model is not reliable at contrast, and an inaccessible theme is a broken
+// theme, so every foreground/background pair it produced is measured here.
+const renderContrastReport = (lightCss, darkCss) => {
+    if (!results.contrastList || !results.contrastSummary) return;
+
+    const toRgb = createColorParser();
+    const modes = [
+        { mode: 'Light', report: auditContrast(lightCss, toRgb) },
+        { mode: 'Dark', report: auditContrast(darkCss, toRgb) }
+    ];
+
+    results.contrastList.replaceChildren();
+
+    const rows = modes.flatMap(m => m.report.map(entry => ({ mode: m.mode, entry })));
+    const failing = rows.filter(row => !row.entry.passesAA);
+
+    results.contrastSummary.textContent = rows.length === 0
+        ? 'not checked'
+        : `${rows.length - failing.length}/${rows.length} pass`;
+    results.contrastSummary.classList.toggle('has-failures', failing.length > 0);
+
+    // Failures first: a theme that reads badly is the reason to look here.
+    const ordered = [...failing, ...rows.filter(row => row.entry.passesAA)];
+
+    for (const { mode, entry } of ordered) {
+        const row = document.createElement('div');
+        row.className = entry.passesAA ? 'contrast-row' : 'contrast-row failing';
+
+        const name = document.createElement('span');
+        name.className = 'contrast-name';
+        name.textContent = `${mode} \u00B7 ${entry.label}`;
+
+        const ratio = document.createElement('span');
+        ratio.className = 'contrast-ratio';
+        ratio.textContent = `${entry.ratio.toFixed(2)}:1`;
+
+        const level = document.createElement('span');
+        level.className = 'contrast-level';
+        level.textContent = entry.level;
+
+        row.append(name, ratio, level);
+        row.title = `${entry.foreground} on ${entry.background}`;
+        results.contrastList.appendChild(row);
+    }
+};
+
+const restoreTheme = (entry) => {
+    if (!entry || !entry.light || !entry.dark) return;
+
+    themes.light = entry.light;
+    themes.dark = entry.dark;
+
+    if (entry.format) {
+        selectedFormatValue = entry.format;
+        document.querySelectorAll('.format-badge').forEach(b => {
+            b.textContent = entry.format.toUpperCase();
+        });
+    }
+
+    renderPalette(themes.light, results.lightPalette);
+    renderPalette(themes.dark, results.darkPalette);
+    renderContrastReport(themes.light, themes.dark);
+    showView('result');
+    updateStatus('Theme restored');
+};
+
+const renderHistory = () => {
+    if (!historyEls.section || !historyEls.list) return;
+
+    if (!themeHistory.length) {
+        historyEls.section.classList.add('hidden');
+        return;
+    }
+
+    historyEls.section.classList.remove('hidden');
+    historyEls.list.replaceChildren();
+
+    themeHistory.forEach((entry) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'history-item';
+
+        const site = document.createElement('span');
+        site.className = 'history-site';
+        site.textContent = entry.site || 'Unknown site';
+
+        const meta = document.createElement('span');
+        meta.className = 'history-meta';
+        meta.textContent = (entry.format || '').toUpperCase();
+
+        button.append(site, meta);
+        button.title = `Restore the theme generated for ${entry.site || 'this site'}`;
+        button.onclick = () => restoreTheme(entry);
+
+        historyEls.list.appendChild(button);
+    });
+};
+
 // The dropdown is a listbox: it owns roving focus across its options and
 // responds to the arrow/Home/End/Enter/Escape keys a native select would.
 const initDropdown = () => {

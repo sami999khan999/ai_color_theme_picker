@@ -83,6 +83,21 @@ const splitSseFrames = (buffer) => {
     return { payloads, remainder };
 };
 
+// Tailwind v4 consumes theme colours through @theme rather than a config file,
+// so the variables are re-exposed as --color-* tokens pointing at the originals.
+const toTailwindTheme = (lightCssBody) => {
+    const lines = Object.keys(parseCssVariables(lightCssBody))
+        .filter(name => name !== '--radius')
+        .map(name => `  --color-${name.replace(/^--/, '')}: var(${name});`);
+
+    return `@theme inline {\n${lines.join('\n')}\n}`;
+};
+
+const toThemeJson = (lightCssBody, darkCssBody) => JSON.stringify({
+    light: parseCssVariables(lightCssBody),
+    dark: parseCssVariables(darkCssBody),
+}, null, 2);
+
 const copyToClipboard = (text, element) => {
     // The label is cached on the element the first time round. Reading
     // innerHTML at click time meant a second click inside the timeout window

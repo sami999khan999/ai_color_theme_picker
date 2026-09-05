@@ -1,4 +1,3 @@
-const GEMINI_MODEL = 'gemini-2.5-flash';
 // Abort if the stream goes quiet for this long. Measured between chunks rather
 // than over the whole request, so a slow-but-alive generation is not cut off.
 const STREAM_IDLE_TIMEOUT_MS = 30000;
@@ -15,7 +14,7 @@ const requestThemeStream = async (requestBody, signal) => {
     let lastError;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${selectedModel}:streamGenerateContent?alt=sse`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -93,6 +92,7 @@ const handleGenerate = async () => {
 
         updateStatus('AI is crafting your theme...');
         const stylePrompt = controls.userPrompt.value.trim() || 'modern professional';
+        await persistPreferences();
         const selectedFormat = selectedFormatValue.toUpperCase();
 
         // Update result badges immediately
@@ -283,7 +283,17 @@ Rules:
             
             renderPalette(themes.light, results.lightPalette);
             renderPalette(themes.dark, results.darkPalette);
-            
+            renderContrastReport(themes.light, themes.dark);
+
+            await persistTheme({
+                light: themes.light,
+                dark: themes.dark,
+                format: selectedFormatValue,
+                site: tab.url ? new URL(tab.url).hostname : '',
+                createdAt: Date.now()
+            });
+            renderHistory();
+
             showView('result');
             updateStatus('Theme generated');
         } else {
@@ -306,11 +316,69 @@ Rules:
     }
 };
 
+// Injects the generated variables into the active tab so the theme can be seen
+// applied before it is copied. insertCSS/removeCSS is reversible and needs no
+// permission beyond the `scripting` one already used for extraction.
+const previewCss = () => `${wrapCssBlock(':root', themes.light)}\n\n${wrapCssBlock('.dark', themes.dark)}`;
+
+const setPreviewLabel = (isOn) => {
+    if (controls.previewToggleLabel) {
+        controls.previewToggleLabel.textContent = isOn ? 'Stop preview' : 'Preview on this page';
+    }
+    if (controls.previewToggle) {
+        controls.previewToggle.setAttribute('aria-pressed', String(isOn));
+        controls.previewToggle.classList.toggle('active', isOn);
+    }
+};
+
+const stopPreview = async () => {
+    if (previewTabId === null) return;
+
+    try {
+        await chrome.scripting.removeCSS({ target: { tabId: previewTabId }, css: previewCss() });
+    } catch (e) {
+        console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+    }
+
+    previewTabId = null;
+    setPreviewLabel(false);
+};
+
+const togglePreview = async () => {
+    if (previewTabId !== null) {
+        await stopPreview();
+        updateStatus('Preview stopped');
+        return;
+    }
+
+    if (!themes.light || !themes.dark) return;
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id || !tab.url || /^(chrome|edge|about):/.test(tab.url)) {
+        showWarning("Preview is not available on browser system pages.");
+        return;
+    }
+
+    try {
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css: previewCss() });
+        previewTabId = tab.id;
+        setPreviewLabel(true);
+        updateStatus('Previewing on this page');
+    } catch (err) {
+        showError(err);
+    }
+};
+
 const initGeneratorListeners = () => {
-    controls.startOver.onclick = () => {
+    controls.startOver.onclick = async () => {
+        await stopPreview();
         showView('main');
-        controls.userPrompt.value = '';
+        renderHistory();
     };
+
+    if (controls.previewToggle) {
+        controls.previewToggle.onclick = togglePreview;
+    }
 
     controls.generateBtn.onclick = handleGenerate;
 

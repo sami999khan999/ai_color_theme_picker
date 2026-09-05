@@ -12,6 +12,94 @@ const ICONS = {
 };
 
 
+// ─── shared/color.js ───────────────────────────────────────────── 
+// sRGB / WCAG maths. Deliberately DOM-free so it can be unit-tested directly;
+// converting a CSS colour string to RGB needs a browser, so that converter is
+// injected rather than imported.
+
+const srgbChannelToLinear = (channel) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+};
+
+const relativeLuminance = (rgb) =>
+    0.2126 * srgbChannelToLinear(rgb[0]) +
+    0.7152 * srgbChannelToLinear(rgb[1]) +
+    0.0722 * srgbChannelToLinear(rgb[2]);
+
+const contrastRatio = (rgbA, rgbB) => {
+    const a = relativeLuminance(rgbA);
+    const b = relativeLuminance(rgbB);
+    const lighter = Math.max(a, b);
+    const darker = Math.min(a, b);
+    return (lighter + 0.05) / (darker + 0.05);
+};
+
+// WCAG 2.1 thresholds for text on a background.
+const wcagLevel = (ratio) => {
+    if (ratio >= 7) return 'AAA';
+    if (ratio >= 4.5) return 'AA';
+    if (ratio >= 3) return 'AA Large';
+    return 'Fail';
+};
+
+// The shadcn variables where one is explicitly the readable foreground for
+// another. Variables outside this list carry no contrast requirement.
+const CONTRAST_PAIRS = [
+    ['--background', '--foreground'],
+    ['--card', '--card-foreground'],
+    ['--popover', '--popover-foreground'],
+    ['--primary', '--primary-foreground'],
+    ['--secondary', '--secondary-foreground'],
+    ['--muted', '--muted-foreground'],
+    ['--accent', '--accent-foreground'],
+    ['--sidebar', '--sidebar-foreground'],
+    ['--sidebar-primary', '--sidebar-primary-foreground'],
+    ['--sidebar-accent', '--sidebar-accent-foreground'],
+];
+
+const parseCssVariables = (cssBody) => {
+    const vars = {};
+    const regex = /(--[\w-]+):\s*([^;]+);/g;
+    let match;
+
+    while ((match = regex.exec(cssBody)) !== null) {
+        vars[match[1]] = match[2].trim();
+    }
+
+    return vars;
+};
+
+// `toRgb` takes a CSS colour string and returns [r, g, b] or null.
+const auditContrast = (cssBody, toRgb) => {
+    const vars = parseCssVariables(cssBody);
+    const report = [];
+
+    for (const [bgName, fgName] of CONTRAST_PAIRS) {
+        const bgValue = vars[bgName];
+        const fgValue = vars[fgName];
+        if (!bgValue || !fgValue) continue;
+
+        const bg = toRgb(bgValue);
+        const fg = toRgb(fgValue);
+        if (!bg || !fg) continue;
+
+        const ratio = contrastRatio(bg, fg);
+
+        report.push({
+            label: bgName.replace(/^--/, ''),
+            background: bgValue,
+            foreground: fgValue,
+            ratio: Math.round(ratio * 100) / 100,
+            level: wcagLevel(ratio),
+            passesAA: ratio >= 4.5,
+        });
+    }
+
+    return report;
+};
+
+
 // ─── shared/utils.js ───────────────────────────────────────────── 
 const getFriendlyError = (error) => {
     // A status code captured at the fetch site is authoritative. Substring
@@ -97,6 +185,21 @@ const splitSseFrames = (buffer) => {
 
     return { payloads, remainder };
 };
+
+// Tailwind v4 consumes theme colours through @theme rather than a config file,
+// so the variables are re-exposed as --color-* tokens pointing at the originals.
+const toTailwindTheme = (lightCssBody) => {
+    const lines = Object.keys(parseCssVariables(lightCssBody))
+        .filter(name => name !== '--radius')
+        .map(name => `  --color-${name.replace(/^--/, '')}: var(${name});`);
+
+    return `@theme inline {\n${lines.join('\n')}\n}`;
+};
+
+const toThemeJson = (lightCssBody, darkCssBody) => JSON.stringify({
+    light: parseCssVariables(lightCssBody),
+    dark: parseCssVariables(darkCssBody),
+}, null, 2);
 
 const copyToClipboard = (text, element) => {
     // The label is cached on the element the first time round. Reading
@@ -217,6 +320,11 @@ const keyListEls = {
     list: document.getElementById('key-list')
 };
 
+const historyEls = {
+    section: document.getElementById('history-section'),
+    list: document.getElementById('history-list')
+};
+
 const controls = {
     apiKeyName: document.getElementById('api-key-name'),
     apiKey: document.getElementById('api-key'),
@@ -232,6 +340,9 @@ const controls = {
     generatingPreview: document.getElementById('generating-preview'),
     liveCodeStream: document.getElementById('live-code-stream'),
     cancelGenerate: document.getElementById('cancel-generate'),
+    modelSelect: document.getElementById('model-select'),
+    previewToggle: document.getElementById('preview-toggle'),
+    previewToggleLabel: document.getElementById('preview-toggle-label'),
     shortcutHint: document.getElementById('shortcut-hint'),
     shortcutKbd: document.getElementById('shortcut-kbd'),
 };
@@ -248,16 +359,70 @@ const results = {
     copyLight: document.getElementById('copy-light'),
     copyDark: document.getElementById('copy-dark'),
     copyFull: document.getElementById('copy-full'),
+    copyTailwind: document.getElementById('copy-tailwind'),
+    copyJson: document.getElementById('copy-json'),
+    contrastSummary: document.getElementById('contrast-summary'),
+    contrastList: document.getElementById('contrast-list'),
     lightPalette: document.getElementById('light-palette'),
     darkPalette: document.getElementById('dark-palette')
 };
 
 let selectedFormatValue = 'oklch';
+let selectedModel = 'gemini-2.5-flash';
+let themeHistory = [];
+let previewTabId = null;
 let geminiApiKey = '';
 let apiKeys = [];
 const themes = { light: '', dark: '' };
 let currentView = '';
 let isGenerating = false;
+
+
+// ─── popup/storage.js ──────────────────────────────────────────── 
+// Everything the popup remembers between sessions. Previously only the API keys
+// survived a close: the colour format reset to oklch on every open, and the
+// prompt and generated theme were lost entirely.
+
+const STORAGE_KEYS = {
+    activeKey: 'geminiApiKey',
+    apiKeys: 'apiKeys',
+    format: 'colorFormat',
+    prompt: 'lastPrompt',
+    lastTheme: 'lastTheme',
+    history: 'themeHistory',
+    model: 'geminiModel',
+};
+
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+const MAX_HISTORY = 5;
+
+const readStorage = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
+const writeStorage = (values) => new Promise(resolve => chrome.storage.local.set(values, resolve));
+
+const persistPreferences = () => writeStorage({
+    [STORAGE_KEYS.format]: selectedFormatValue,
+    [STORAGE_KEYS.model]: selectedModel,
+    [STORAGE_KEYS.prompt]: controls.userPrompt ? controls.userPrompt.value : '',
+});
+
+// Newest first, de-duplicated by site so repeatedly regenerating one page does
+// not push everything else out of a five-entry list.
+const addHistoryEntry = (entry, history) => {
+    const deduped = history.filter(item => item.site !== entry.site);
+    return [entry, ...deduped].slice(0, MAX_HISTORY);
+};
+
+const persistTheme = async (theme) => {
+    const stored = await readStorage([STORAGE_KEYS.history]);
+    const history = Array.isArray(stored[STORAGE_KEYS.history]) ? stored[STORAGE_KEYS.history] : [];
+
+    themeHistory = addHistoryEntry(theme, history);
+
+    await writeStorage({
+        [STORAGE_KEYS.lastTheme]: theme,
+        [STORAGE_KEYS.history]: themeHistory,
+    });
+};
 
 
 // ─── popup/ui.js ───────────────────────────────────────────────── 
@@ -387,6 +552,139 @@ const renderPalette = (cssString, container) => {
         swatch.title = isRenderable ? `${name}: ${value}` : `${name}: ${value} — not a valid CSS color`;
         container.appendChild(swatch);
     }
+};
+
+// One canvas, reused, to turn any CSS colour the browser understands into RGB.
+// CSS.supports filters out values that are not colours at all, so an
+// unparseable value is reported rather than silently scored.
+const createColorParser = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const cache = new Map();
+
+    return (value) => {
+        const key = String(value || '').trim();
+        if (!key) return null;
+        if (cache.has(key)) return cache.get(key);
+
+        let rgb = null;
+        const supported = typeof CSS !== 'undefined' && CSS.supports
+            ? CSS.supports('color', key)
+            : true;
+
+        if (ctx && supported) {
+            try {
+                ctx.fillStyle = key;
+                ctx.fillRect(0, 0, 1, 1);
+                const data = ctx.getImageData(0, 0, 1, 1).data;
+                rgb = [data[0], data[1], data[2]];
+            } catch {
+                rgb = null;
+            }
+        }
+
+        cache.set(key, rgb);
+        return rgb;
+    };
+};
+
+// The model is not reliable at contrast, and an inaccessible theme is a broken
+// theme, so every foreground/background pair it produced is measured here.
+const renderContrastReport = (lightCss, darkCss) => {
+    if (!results.contrastList || !results.contrastSummary) return;
+
+    const toRgb = createColorParser();
+    const modes = [
+        { mode: 'Light', report: auditContrast(lightCss, toRgb) },
+        { mode: 'Dark', report: auditContrast(darkCss, toRgb) }
+    ];
+
+    results.contrastList.replaceChildren();
+
+    const rows = modes.flatMap(m => m.report.map(entry => ({ mode: m.mode, entry })));
+    const failing = rows.filter(row => !row.entry.passesAA);
+
+    results.contrastSummary.textContent = rows.length === 0
+        ? 'not checked'
+        : `${rows.length - failing.length}/${rows.length} pass`;
+    results.contrastSummary.classList.toggle('has-failures', failing.length > 0);
+
+    // Failures first: a theme that reads badly is the reason to look here.
+    const ordered = [...failing, ...rows.filter(row => row.entry.passesAA)];
+
+    for (const { mode, entry } of ordered) {
+        const row = document.createElement('div');
+        row.className = entry.passesAA ? 'contrast-row' : 'contrast-row failing';
+
+        const name = document.createElement('span');
+        name.className = 'contrast-name';
+        name.textContent = `${mode} \u00B7 ${entry.label}`;
+
+        const ratio = document.createElement('span');
+        ratio.className = 'contrast-ratio';
+        ratio.textContent = `${entry.ratio.toFixed(2)}:1`;
+
+        const level = document.createElement('span');
+        level.className = 'contrast-level';
+        level.textContent = entry.level;
+
+        row.append(name, ratio, level);
+        row.title = `${entry.foreground} on ${entry.background}`;
+        results.contrastList.appendChild(row);
+    }
+};
+
+const restoreTheme = (entry) => {
+    if (!entry || !entry.light || !entry.dark) return;
+
+    themes.light = entry.light;
+    themes.dark = entry.dark;
+
+    if (entry.format) {
+        selectedFormatValue = entry.format;
+        document.querySelectorAll('.format-badge').forEach(b => {
+            b.textContent = entry.format.toUpperCase();
+        });
+    }
+
+    renderPalette(themes.light, results.lightPalette);
+    renderPalette(themes.dark, results.darkPalette);
+    renderContrastReport(themes.light, themes.dark);
+    showView('result');
+    updateStatus('Theme restored');
+};
+
+const renderHistory = () => {
+    if (!historyEls.section || !historyEls.list) return;
+
+    if (!themeHistory.length) {
+        historyEls.section.classList.add('hidden');
+        return;
+    }
+
+    historyEls.section.classList.remove('hidden');
+    historyEls.list.replaceChildren();
+
+    themeHistory.forEach((entry) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'history-item';
+
+        const site = document.createElement('span');
+        site.className = 'history-site';
+        site.textContent = entry.site || 'Unknown site';
+
+        const meta = document.createElement('span');
+        meta.className = 'history-meta';
+        meta.textContent = (entry.format || '').toUpperCase();
+
+        button.append(site, meta);
+        button.title = `Restore the theme generated for ${entry.site || 'this site'}`;
+        button.onclick = () => restoreTheme(entry);
+
+        historyEls.list.appendChild(button);
+    });
 };
 
 // The dropdown is a listbox: it owns roving focus across its options and
@@ -648,7 +946,6 @@ const initApiKeyListeners = () => {
 
 
 // ─── popup/generator.js ────────────────────────────────────────── 
-const GEMINI_MODEL = 'gemini-2.5-flash';
 // Abort if the stream goes quiet for this long. Measured between chunks rather
 // than over the whole request, so a slow-but-alive generation is not cut off.
 const STREAM_IDLE_TIMEOUT_MS = 30000;
@@ -665,7 +962,7 @@ const requestThemeStream = async (requestBody, signal) => {
     let lastError;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${selectedModel}:streamGenerateContent?alt=sse`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -743,6 +1040,7 @@ const handleGenerate = async () => {
 
         updateStatus('AI is crafting your theme...');
         const stylePrompt = controls.userPrompt.value.trim() || 'modern professional';
+        await persistPreferences();
         const selectedFormat = selectedFormatValue.toUpperCase();
 
         // Update result badges immediately
@@ -933,7 +1231,17 @@ Rules:
             
             renderPalette(themes.light, results.lightPalette);
             renderPalette(themes.dark, results.darkPalette);
-            
+            renderContrastReport(themes.light, themes.dark);
+
+            await persistTheme({
+                light: themes.light,
+                dark: themes.dark,
+                format: selectedFormatValue,
+                site: tab.url ? new URL(tab.url).hostname : '',
+                createdAt: Date.now()
+            });
+            renderHistory();
+
             showView('result');
             updateStatus('Theme generated');
         } else {
@@ -956,11 +1264,69 @@ Rules:
     }
 };
 
+// Injects the generated variables into the active tab so the theme can be seen
+// applied before it is copied. insertCSS/removeCSS is reversible and needs no
+// permission beyond the `scripting` one already used for extraction.
+const previewCss = () => `${wrapCssBlock(':root', themes.light)}\n\n${wrapCssBlock('.dark', themes.dark)}`;
+
+const setPreviewLabel = (isOn) => {
+    if (controls.previewToggleLabel) {
+        controls.previewToggleLabel.textContent = isOn ? 'Stop preview' : 'Preview on this page';
+    }
+    if (controls.previewToggle) {
+        controls.previewToggle.setAttribute('aria-pressed', String(isOn));
+        controls.previewToggle.classList.toggle('active', isOn);
+    }
+};
+
+const stopPreview = async () => {
+    if (previewTabId === null) return;
+
+    try {
+        await chrome.scripting.removeCSS({ target: { tabId: previewTabId }, css: previewCss() });
+    } catch (e) {
+        console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+    }
+
+    previewTabId = null;
+    setPreviewLabel(false);
+};
+
+const togglePreview = async () => {
+    if (previewTabId !== null) {
+        await stopPreview();
+        updateStatus('Preview stopped');
+        return;
+    }
+
+    if (!themes.light || !themes.dark) return;
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id || !tab.url || /^(chrome|edge|about):/.test(tab.url)) {
+        showWarning("Preview is not available on browser system pages.");
+        return;
+    }
+
+    try {
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css: previewCss() });
+        previewTabId = tab.id;
+        setPreviewLabel(true);
+        updateStatus('Previewing on this page');
+    } catch (err) {
+        showError(err);
+    }
+};
+
 const initGeneratorListeners = () => {
-    controls.startOver.onclick = () => {
+    controls.startOver.onclick = async () => {
+        await stopPreview();
         showView('main');
-        controls.userPrompt.value = '';
+        renderHistory();
     };
+
+    if (controls.previewToggle) {
+        controls.previewToggle.onclick = togglePreview;
+    }
 
     controls.generateBtn.onclick = handleGenerate;
 
@@ -980,6 +1346,40 @@ const initGeneratorListeners = () => {
 
 
 // ─── popup/init.js ─────────────────────────────────────────────── 
+// Puts the stored format, model, prompt and history back in place. Only the API
+// keys used to survive a popup close.
+const restorePreferences = (stored) => {
+    if (stored[STORAGE_KEYS.format]) {
+        selectedFormatValue = stored[STORAGE_KEYS.format];
+        const option = customDropdown.items.find(
+            item => item.getAttribute('data-value') === selectedFormatValue
+        );
+        if (option) {
+            customDropdown.label.textContent = option.textContent;
+            customDropdown.items.forEach((opt) => {
+                const isSelected = opt === option;
+                opt.classList.toggle('active', isSelected);
+                opt.setAttribute('aria-selected', String(isSelected));
+            });
+        }
+    }
+
+    selectedModel = stored[STORAGE_KEYS.model] || DEFAULT_MODEL;
+    if (controls.modelSelect) controls.modelSelect.value = selectedModel;
+
+    if (stored[STORAGE_KEYS.prompt] && controls.userPrompt) {
+        controls.userPrompt.value = stored[STORAGE_KEYS.prompt];
+    }
+
+    themeHistory = Array.isArray(stored[STORAGE_KEYS.history]) ? stored[STORAGE_KEYS.history] : [];
+
+    const last = stored[STORAGE_KEYS.lastTheme];
+    if (last && last.light && last.dark) {
+        themes.light = last.light;
+        themes.dark = last.dark;
+    }
+};
+
 // Re-indents every declaration, not just the first. The old template literal
 // put two spaces before the opening line and left the rest flush left.
 const wrapCssBlock = (selector, body) => {
@@ -1014,8 +1414,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initApiKeyListeners();
     initGeneratorListeners();
 
-    // Load API Keys and perform initial scan
-    chrome.storage.local.get(['geminiApiKey', 'apiKeys'], (result) => {
+    if (controls.modelSelect) {
+        controls.modelSelect.onchange = () => {
+            selectedModel = controls.modelSelect.value;
+            persistPreferences();
+        };
+    }
+
+    // Load stored keys, preferences and history.
+    chrome.storage.local.get(Object.values(STORAGE_KEYS), (result) => {
         const rawKeys = result.apiKeys || [];
         // Migration: Convert string keys to objects if necessary
         apiKeys = rawKeys.map(k => {
@@ -1024,6 +1431,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }).filter(k => k !== null);
         
+        restorePreferences(result);
+
         if (result.geminiApiKey) {
             geminiApiKey = result.geminiApiKey;
             if (!apiKeys.some(k => k.key === geminiApiKey)) {
@@ -1035,6 +1444,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showView('setup');
         }
         renderKeyList();
+        renderHistory();
     });
 
     // Success View: Copy handlers
@@ -1044,6 +1454,16 @@ document.addEventListener('DOMContentLoaded', () => {
         `${wrapCssBlock(':root', themes.light)}\n\n${wrapCssBlock('.dark', themes.dark)}`,
         results.copyFull
     );
+
+    if (results.copyTailwind) {
+        results.copyTailwind.onclick = () =>
+            copyToClipboard(toTailwindTheme(themes.light), results.copyTailwind);
+    }
+
+    if (results.copyJson) {
+        results.copyJson.onclick = () =>
+            copyToClipboard(toThemeJson(themes.light, themes.dark), results.copyJson);
+    }
 
     // Show errors in the UI instead of letting them break the popup silently.
     // The handler deliberately does NOT return true: returning true cancels the
