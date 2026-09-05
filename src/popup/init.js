@@ -1,20 +1,7 @@
 // Puts the stored format, model, prompt and history back in place. Only the API
 // keys used to survive a popup close.
 const restorePreferences = (stored) => {
-    if (stored[STORAGE_KEYS.format]) {
-        selectedFormatValue = stored[STORAGE_KEYS.format];
-        const option = customDropdown.items.find(
-            item => item.getAttribute('data-value') === selectedFormatValue
-        );
-        if (option) {
-            customDropdown.label.textContent = option.textContent;
-            customDropdown.items.forEach((opt) => {
-                const isSelected = opt === option;
-                opt.classList.toggle('active', isSelected);
-                opt.setAttribute('aria-selected', String(isSelected));
-            });
-        }
-    }
+    applyFormatSelection(stored[STORAGE_KEYS.format]);
 
     selectedModel = stored[STORAGE_KEYS.model] || DEFAULT_MODEL;
     if (controls.modelSelect) controls.modelSelect.value = selectedModel;
@@ -97,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderKeyList();
         renderHistory();
+        restorePreviewState();
     });
 
     // Success View: Copy handlers

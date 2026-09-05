@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
     lastTheme: 'lastTheme',
     history: 'themeHistory',
     model: 'geminiModel',
+    preview: 'activePreview',
 };
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';

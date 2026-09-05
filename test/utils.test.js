@@ -101,17 +101,23 @@ test('splitSseFrames handles frames that straddle chunk boundaries', async (t) =
 // A stand-in for the browser APIs extractColorsFunc reaches for once injected
 // into the page. Counters let the tests assert on call volume, which is the
 // whole point of the memoisation.
+//
+// The document element is a *different* object from the elements in the
+// traversal list, so the harness can tell the seven getVar() probes on :root
+// apart from the per-element visits and index colorFor by element. Sharing one
+// object silently shifted that index by seven and made a cap test unfalsifiable.
 const makeDom = ({ elementCount, colorFor, canvasThrows = false }) => {
-    const counters = { getComputedStyle: 0, getImageData: 0 };
+    const counters = { getComputedStyle: 0, getImageData: 0, elementVisits: 0 };
+    const root = {};
     const element = {};
     const elements = Array.from({ length: elementCount }, () => element);
     let pending = '';
 
     const sandbox = {
         document: {
-            body: element,
-            documentElement: element,
-            querySelector: () => element,
+            body: root,
+            documentElement: root,
+            querySelector: () => root,
             querySelectorAll: () => elements,
             createElement: () => ({
                 getContext: () =>
@@ -131,9 +137,20 @@ const makeDom = ({ elementCount, colorFor, canvasThrows = false }) => {
             }),
         },
         window: {
-            getComputedStyle: () => {
-                const index = counters.getComputedStyle++;
-                return { ...colorFor(index), getPropertyValue: () => '' };
+            getComputedStyle: (node) => {
+                counters.getComputedStyle++;
+                if (node !== element) {
+                    // :root / body / button probes contribute no palette colours.
+                    return {
+                        color: 'transparent',
+                        backgroundColor: 'transparent',
+                        borderColor: 'transparent',
+                        fill: 'none',
+                        stroke: 'none',
+                        getPropertyValue: () => '',
+                    };
+                }
+                return { ...colorFor(counters.elementVisits++), getPropertyValue: () => '' };
             },
         },
     };
@@ -182,6 +199,28 @@ test('extractColorsFunc keeps the page scan cheap', async (t) => {
             counters.getComputedStyle < 100,
             `expected an early exit, got ${counters.getComputedStyle} getComputedStyle calls`
         );
+    });
+
+    await t.test('never exceeds the cap, even when one element crosses it', () => {
+        // With at most five properties per element, any uniform rate divides 60
+        // exactly, so the total always lands on the cap and a per-element check
+        // looks correct. Element 11 contributes only four new colours, shifting
+        // the running total to 59 — so element 12 crosses the cap mid-element.
+        const five = (base) => ({
+            color: `rgb(${base})`,
+            backgroundColor: `rgb(${base + 1})`,
+            borderColor: `rgb(${base + 2})`,
+            fill: `rgb(${base + 3})`,
+            stroke: `rgb(${base + 4})`,
+        });
+
+        const { sandbox } = makeDom({
+            elementCount: 500,
+            colorFor: (i) => (i === 11 ? { ...five(i * 5), stroke: `rgb(${i * 5})` } : five(i * 5)),
+        });
+        const { exports } = loadScript('shared/utils.js', ['extractColorsFunc'], sandbox);
+
+        assert.equal(exports.extractColorsFunc().palette.length, 60);
     });
 
     await t.test('normalises colours to uppercase sRGB hex', () => {

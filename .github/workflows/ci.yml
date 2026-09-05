@@ -17,7 +17,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci || npm install
+        # No `|| npm install` fallback: when npm ci rejects an out-of-sync
+        # package-lock.json, a fallback would resolve a different tree and let
+        # CI pass on dependencies nobody committed.
+        run: npm ci
 
       - name: Lint
         run: npm run lint

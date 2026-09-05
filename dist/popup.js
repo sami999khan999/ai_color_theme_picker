@@ -286,6 +286,10 @@ const extractColorsFunc = () => {
         const style = window.getComputedStyle(allElements[i]);
 
         for (let p = 0; p < colorProperties.length; p++) {
+            // The cap is checked per property, not just per element: the outer
+            // loop alone let one element add up to five more colours after the
+            // limit was already reached.
+            if (colorSet.size >= MAX_COLORS) break;
             const hex = toHex(style[colorProperties[p]]);
             if (hex) colorSet.add(hex);
         }
@@ -391,6 +395,7 @@ const STORAGE_KEYS = {
     lastTheme: 'lastTheme',
     history: 'themeHistory',
     model: 'geminiModel',
+    preview: 'activePreview',
 };
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -554,6 +559,32 @@ const renderPalette = (cssString, container) => {
     }
 };
 
+// Puts a colour format into effect everywhere it is visible: the shared state,
+// the dropdown label, the active option and its aria-selected flag, and the
+// result badges. Three call sites used to each do a subset of this, so
+// restoring a history entry left the dropdown showing the previous format
+// while generation used the restored one.
+const applyFormatSelection = (value) => {
+    if (!value) return;
+
+    selectedFormatValue = value;
+
+    const option = customDropdown.items.find(item => item.getAttribute('data-value') === value);
+    if (option && customDropdown.label) {
+        customDropdown.label.textContent = option.textContent;
+    }
+
+    customDropdown.items.forEach((opt) => {
+        const isSelected = opt === option;
+        opt.classList.toggle('active', isSelected);
+        opt.setAttribute('aria-selected', String(isSelected));
+    });
+
+    document.querySelectorAll('.format-badge').forEach((badge) => {
+        badge.textContent = value.toUpperCase();
+    });
+};
+
 // One canvas, reused, to turn any CSS colour the browser understands into RGB.
 // CSS.supports filters out values that are not colours at all, so an
 // unparseable value is reported rather than silently scored.
@@ -641,12 +672,7 @@ const restoreTheme = (entry) => {
     themes.light = entry.light;
     themes.dark = entry.dark;
 
-    if (entry.format) {
-        selectedFormatValue = entry.format;
-        document.querySelectorAll('.format-badge').forEach(b => {
-            b.textContent = entry.format.toUpperCase();
-        });
-    }
+    applyFormatSelection(entry.format);
 
     renderPalette(themes.light, results.lightPalette);
     renderPalette(themes.dark, results.darkPalette);
@@ -690,7 +716,7 @@ const renderHistory = () => {
 // The dropdown is a listbox: it owns roving focus across its options and
 // responds to the arrow/Home/End/Enter/Escape keys a native select would.
 const initDropdown = () => {
-    const { container, header, label, options, items } = customDropdown;
+    const { container, header, options, items } = customDropdown;
     if (!header) return;
 
     const setOpen = (open) => {
@@ -704,14 +730,8 @@ const initDropdown = () => {
     };
 
     const selectItem = (item) => {
-        selectedFormatValue = item.getAttribute('data-value');
-        label.textContent = item.textContent;
-
-        items.forEach((opt) => {
-            const isSelected = opt === item;
-            opt.classList.toggle('active', isSelected);
-            opt.setAttribute('aria-selected', String(isSelected));
-        });
+        applyFormatSelection(item.getAttribute('data-value'));
+        persistPreferences();
 
         setOpen(false);
         header.focus();
@@ -1015,6 +1035,10 @@ const handleGenerate = async () => {
         return;
     }
 
+    // Both a user cancel and the idle timeout abort the same controller, so the
+    // reason has to be recorded to report them differently.
+    let streamTimedOut = false;
+
     isGenerating = true;
     controls.generateBtn.disabled = true;
     controls.btnContent.textContent = 'Crafting...';
@@ -1157,7 +1181,10 @@ Rules:
         let idleTimer = null;
         const resetIdleTimer = () => {
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+            idleTimer = setTimeout(() => {
+                streamTimedOut = true;
+                controller.abort();
+            }, STREAM_IDLE_TIMEOUT_MS);
         };
 
         let fullText = '';
@@ -1250,7 +1277,9 @@ Rules:
     } catch (err) {
         // A cancel or idle-timeout is a user-facing notice, not a failure.
         if (err && err.name === 'AbortError') {
-            showWarning("Generation cancelled.");
+            showWarning(streamTimedOut
+                ? `Gemini stopped responding for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, so the request timed out. Please try again.`
+                : "Generation cancelled.");
         } else {
             showError(err);
         }
@@ -1279,15 +1308,47 @@ const setPreviewLabel = (isOn) => {
     }
 };
 
-const stopPreview = async () => {
-    if (previewTabId === null) return;
+// The popup is destroyed when it closes, so preview state cannot live only in
+// memory: the injected stylesheet would stay on the tab with no way to remove
+// it. The exact CSS is stored alongside the tab id because removeCSS only
+// removes a stylesheet whose text matches what was inserted.
+const restorePreviewState = async () => {
+    const stored = await readStorage([STORAGE_KEYS.preview]);
+    const preview = stored[STORAGE_KEYS.preview];
+    if (!preview || typeof preview.tabId !== 'number') return;
 
+    // Drop the record if that tab is gone; nothing is left to clean up.
     try {
-        await chrome.scripting.removeCSS({ target: { tabId: previewTabId }, css: previewCss() });
-    } catch (e) {
-        console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+        await chrome.tabs.get(preview.tabId);
+    } catch {
+        await writeStorage({ [STORAGE_KEYS.preview]: null });
+        return;
     }
 
+    previewTabId = preview.tabId;
+    setPreviewLabel(true);
+};
+
+const stopPreview = async () => {
+    const stored = await readStorage([STORAGE_KEYS.preview]);
+    const preview = stored[STORAGE_KEYS.preview];
+
+    if (previewTabId === null && !preview) return;
+
+    const tabId = preview && typeof preview.tabId === 'number' ? preview.tabId : previewTabId;
+    // Remove the stylesheet that was actually inserted, not one recomputed from
+    // the current themes, which may have changed since.
+    const css = preview && preview.css ? preview.css : previewCss();
+
+    if (tabId !== null) {
+        try {
+            await chrome.scripting.removeCSS({ target: { tabId }, css });
+        } catch (e) {
+            console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+        }
+    }
+
+    await writeStorage({ [STORAGE_KEYS.preview]: null });
     previewTabId = null;
     setPreviewLabel(false);
 };
@@ -1308,7 +1369,9 @@ const togglePreview = async () => {
     }
 
     try {
-        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css: previewCss() });
+        const css = previewCss();
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css });
+        await writeStorage({ [STORAGE_KEYS.preview]: { tabId: tab.id, css } });
         previewTabId = tab.id;
         setPreviewLabel(true);
         updateStatus('Previewing on this page');
@@ -1349,20 +1412,7 @@ const initGeneratorListeners = () => {
 // Puts the stored format, model, prompt and history back in place. Only the API
 // keys used to survive a popup close.
 const restorePreferences = (stored) => {
-    if (stored[STORAGE_KEYS.format]) {
-        selectedFormatValue = stored[STORAGE_KEYS.format];
-        const option = customDropdown.items.find(
-            item => item.getAttribute('data-value') === selectedFormatValue
-        );
-        if (option) {
-            customDropdown.label.textContent = option.textContent;
-            customDropdown.items.forEach((opt) => {
-                const isSelected = opt === option;
-                opt.classList.toggle('active', isSelected);
-                opt.setAttribute('aria-selected', String(isSelected));
-            });
-        }
-    }
+    applyFormatSelection(stored[STORAGE_KEYS.format]);
 
     selectedModel = stored[STORAGE_KEYS.model] || DEFAULT_MODEL;
     if (controls.modelSelect) controls.modelSelect.value = selectedModel;
@@ -1445,6 +1495,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderKeyList();
         renderHistory();
+        restorePreviewState();
     });
 
     // Success View: Copy handlers

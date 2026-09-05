@@ -40,9 +40,11 @@ the file and line where the problem lives, so tasks can be picked up independent
 **Verifying any change**
 
 ```bash
-node build.js                         # regenerate dist/popup.js
+npm run verify                        # build + lint + test
 # then: chrome://extensions → Developer mode → Reload → open the popup
 ```
+
+`npm run build` on its own only regenerates `dist/popup.js`; it runs no checks.
 
 `dist/popup.js` is a committed build artifact. **Editing `src/` without re-running `node build.js`
 changes nothing at runtime** — the popup loads `dist/popup.js`, not the sources. Re-run the build and
