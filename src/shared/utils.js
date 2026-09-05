@@ -44,7 +44,7 @@ const getFriendlyError = (error) => {
 const copyToClipboard = (text, element) => {
     navigator.clipboard.writeText(text).then(() => {
         const original = element.innerHTML;
-        element.innerHTML = '<span style="color: var(--success); font-weight: 700;">Copied</span>';
+        element.innerHTML = '<span class="copy-feedback">Copied</span>';
         setTimeout(() => element.innerHTML = original, 1500);
     }).catch(() => showError(new Error("Copy failed")));
 };

@@ -11,16 +11,8 @@
     "128": "icons/icon.png"
   },
   "permissions": ["storage", "clipboardWrite", "activeTab", "scripting"],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/content.js"]
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["src/content/inject.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://generativelanguage.googleapis.com"
+  }
 }

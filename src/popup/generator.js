@@ -1,3 +1,5 @@
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
 const performInitialScan = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.id || tab.url.startsWith('chrome://')) return;
@@ -168,9 +170,14 @@ Rules:
         controls.generatingPreview.classList.remove('hidden');
         controls.liveCodeStream.textContent = '';
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:streamGenerateContent?key=${geminiApiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                // Sent as a header rather than a ?key= query parameter so the
+                // key stays out of anything that records request URLs.
+                'x-goog-api-key': geminiApiKey
+            },
             body: JSON.stringify(requestBody)
         });
 

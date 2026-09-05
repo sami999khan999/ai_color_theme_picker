@@ -55,13 +55,13 @@ commit the result with every change.
 > **Goal:** close the XSS, remove the unused code that is injected into every page the user browses,
 > and stop leaking the API key into URL-shaped logs. Nothing else should ship before this phase does.
 
-- [ ] 🔴 **Fix the XSS in the saved-key list.** `src/popup/api-keys.js:16-28` interpolates `item.name`
+- [x] 🔴 **Fix the XSS in the saved-key list.** `src/popup/api-keys.js:16-28` interpolates `item.name`
       — free-form user input — directly into `element.innerHTML`. A key named
       `<img src=x onerror="...">` executes in the popup's privileged context, which has access to
       `chrome.storage.local` where **every saved API key is stored in plaintext**. Rebuild the row
       with `document.createElement` and `textContent`; reserve `innerHTML` for the trusted `ICONS.*`
       SVG constants from `src/shared/icons.js`.
-- [ ] 🔴 **Delete the dead content-script layer.** `manifest.json:14-19` injects
+- [x] 🔴 **Delete the dead content-script layer.** `manifest.json:14-19` injects
       `src/content/content.js` into `<all_urls>`, which injects `src/content/inject.js` into every
       page's main world on every page load. Nothing ever sends the `CALL_AI_VIA_INJECTION` message
       that would activate it — the string appears only at `src/content/content.js:17` — and nothing
@@ -69,24 +69,24 @@ commit the result with every change.
       from the popup yet runs everywhere. Remove the directory, the `content_scripts` block, and the
       `web_accessible_resources` block. This also drops the "read and change all your data on all
       websites" warning shown at install.
-- [ ] 🔴 **Do not reintroduce unvalidated `postMessage`.** For the record of why the above is not just
+- [x] 🔴 **Do not reintroduce unvalidated `postMessage`.** For the record of why the above is not just
       dead weight: `src/content/content.js:28` accepts `FROM_PAGE_CONTEXT` messages with no origin
       check, and both sides post with a `'*'` target origin. Any page could forge an AI response or
       read the relayed prompt. Resolved by deletion; noted so the bridge is not rebuilt this way.
-- [ ] 🟠 **Move the API key out of the URL.** `src/popup/generator.js:171` sends it as
+- [x] 🟠 **Move the API key out of the URL.** `src/popup/generator.js:171` sends it as
       `?key=${geminiApiKey}`. Pass it in the `x-goog-api-key` header instead, so it stays out of
       anything that records request URLs.
-- [ ] 🟠 **Declare `host_permissions`.** `manifest.json:13` lists only
+- [x] 🟠 **Declare `host_permissions`.** `manifest.json:13` lists only
       `["storage","clipboardWrite","activeTab","scripting"]` — no host permissions at all. The call to
       `generativelanguage.googleapis.com` currently succeeds only because that endpoint returns
       permissive CORS headers, which is a dependency on someone else's server config. Add
       `"host_permissions": ["https://generativelanguage.googleapis.com/*"]`.
-- [ ] 🟡 **Stop fetching fonts from a third party.** `src/popup/popup.html:8-10` loads Plus Jakarta
+- [x] 🟡 **Stop fetching fonts from a third party.** `src/popup/popup.html:8-10` loads Plus Jakarta
       Sans from `fonts.googleapis.com` every time the popup opens. That is a third-party request on
       every use, it contradicts the "No Tracking" claim in `README.md:78`, and it leaves the popup on
       a fallback font when offline. Self-host the `.woff2` under `assets/` or switch to a system font
       stack.
-- [ ] 🟡 **Declare an explicit CSP.** `manifest.json` has no
+- [x] 🟡 **Declare an explicit CSP.** `manifest.json` has no
       `content_security_policy.extension_pages` entry. Add one rather than relying on the MV3 default.
 
 **Exit criteria:** a key named `<img src=x onerror=alert(1)>` renders as literal text; `src/content/`
@@ -265,10 +265,10 @@ when `dist/` is stale.
       replace the timers with a manual dismiss.
 - [ ] 🟡 **Manage focus across views.** `showView` (`src/popup/ui.js:5-30`) toggles a `.hidden` class
       and never moves focus, so keyboard focus is left on an element in a now-hidden view.
-- [ ] 🟡 **Don't discard a renamed key.** `src/popup/api-keys.js:71-73` skips the `push` when the key
+- [x] 🟡 **Don't discard a renamed key.** `src/popup/api-keys.js:71-73` skips the `push` when the key
       value already exists, silently throwing away the newly typed name. Update the existing entry's
       name instead.
-- [ ] 🟢 **Fix key masking for short input.** `src/popup/api-keys.js:12` builds
+- [x] 🟢 **Fix key masking for short input.** `src/popup/api-keys.js:12` builds
       `key.slice(0, 6) + '...' + key.slice(-4)`. For a key under 10 characters the two slices overlap
       and characters are duplicated. Guard on length.
 - [ ] 🟢 **Mark unrenderable swatches.** `src/popup/ui.js:115` assigns the model's raw value to
