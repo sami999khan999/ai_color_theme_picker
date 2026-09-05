@@ -100,7 +100,7 @@ extension still generates a theme end to end.
 > **Goal:** fix the defects a user hits in normal operation — spurious errors on open, duplicate
 > generations, truncated themes, and misreported failures.
 
-- [ ] 🟠 **Fix or remove `performInitialScan`.** `src/popup/generator.js:1-13` has two problems.
+- [x] 🟠 **Fix or remove `performInitialScan`.** `src/popup/generator.js:1-13` has two problems.
       First, `chrome.tabs.query` and `tab.url.startsWith('chrome://')` sit **outside** the `try`
       block, so a tab whose `url` is unreadable throws a `TypeError` that escapes as an unhandled
       rejection into the global handler at `src/popup/init.js:42` and paints a spurious error strip
@@ -108,43 +108,43 @@ extension still generates a theme end to end.
       then **discarded** — a full-page color sweep runs on every popup open and is thrown away.
       Either delete the function outright, or guard `!tab.url` and cache the result for
       `handleGenerate` to reuse.
-- [ ] 🟠 **Prevent double generation.** `src/popup/generator.js:281-286` invokes `handleGenerate`
+- [x] 🟠 **Prevent double generation.** `src/popup/generator.js:281-286` invokes `handleGenerate`
       straight from the keydown handler without consulting `isGenerating`. That flag
       (`src/popup/state.js:51`) is assigned in two places and **never read anywhere in the codebase**.
       Two quick keypresses start two concurrent streams that race to write the same DOM. Check the
       flag at the top of `handleGenerate` and return early.
-- [ ] 🟠 **Stop hijacking Shift+Enter.** The same handler treats a bare `shiftKey` as submit, so users
+- [x] 🟠 **Stop hijacking Shift+Enter.** The same handler treats a bare `shiftKey` as submit, so users
       cannot type a newline in the prompt textarea — the one place a multi-line input is expected.
       Restrict the shortcut to Ctrl/Cmd+Enter and update the hint at `src/popup/popup.html:76`.
-- [ ] 🟠 **Fix the CSS block extractor.** `src/popup/generator.js:246-247` uses non-greedy
+- [x] 🟠 **Fix the CSS block extractor.** `src/popup/generator.js:246-247` uses non-greedy
       `/:root\s*{([\s\S]+?)}/`. The first `}` terminates the match, so any nested block or `@media`
       wrapper in the model output silently truncates the theme to a fragment, and the user is told
       generation succeeded. Replace both regexes with a brace-counting extractor that finds the
       matching close brace.
-- [ ] 🟠 **Fix the invalid alpha syntax in the prompt.** `src/popup/generator.js:108-109` and `:122`
+- [x] 🟠 **Fix the invalid alpha syntax in the prompt.** `src/popup/generator.js:108-109` and `:122`
       instruct the model to emit `--border: <color> / <opacity>`. Combined with rule 2 at `:162`
       ("FULLY WRAPPED, VALID CSS color values"), this reliably produces uncompilable CSS such as
       `rgb(1, 2, 3) / 0.1`. The correct shadcn form places alpha inside the color function:
       `oklch(1 0 0 / 10%)`. Rewrite the skeleton accordingly.
-- [ ] 🟠 **Report blocked responses honestly.** The stream loop reads only
+- [x] 🟠 **Report blocked responses honestly.** The stream loop reads only
       `candidates[0].content.parts[0].text` and swallows every exception at
       `src/popup/generator.js:229` with an empty `catch`. When Gemini returns a `promptFeedback.
       blockReason` or `finishReason: "SAFETY"`, `fullText` stays empty and the user sees "couldn't
       parse the CSS colors" — pointing them at their prompt wording instead of the real cause. Read
       those fields and surface them.
-- [ ] 🟡 **Fix the copy-button label corruption.** `src/shared/utils.js:44-50` stores
+- [x] 🟡 **Fix the copy-button label corruption.** `src/shared/utils.js:44-50` stores
       `element.innerHTML` in `original` at click time. A second click inside the 1,500 ms window
       captures the *"Copied"* markup as `original`, so the button is permanently relabeled. Capture
       the label once at init, or ignore clicks while the timer is pending.
-- [ ] 🟡 **Stop suppressing the console.** `src/popup/init.js:37-40` returns `true` from
+- [x] 🟡 **Stop suppressing the console.** `src/popup/init.js:37-40` returns `true` from
       `window.onerror`, which cancels the default logging. Every runtime error becomes invisible in
       DevTools — the reason several bugs in this list could persist unnoticed. Log the error before
       returning.
-- [ ] 🟡 **Replace substring-based error classification.** `src/shared/utils.js:17` maps *any* message
+- [x] 🟡 **Replace substring-based error classification.** `src/shared/utils.js:17` maps *any* message
       containing the substring `key` to "Invalid API Key", and `:10` maps any `limit` to a quota
       message — so an unrelated error mentioning a JSON key is reported as an auth failure. Capture
       the HTTP status at the fetch site in `generator.js` and branch on that instead.
-- [ ] 🟢 **Resolve the `⌘G` discrepancy.** `src/popup/popup.html:103` renders `<kbd>⌘G</kbd>` and
+- [x] 🟢 **Resolve the `⌘G` discrepancy.** `src/popup/popup.html:103` renders `<kbd>⌘G</kbd>` and
       `README.md:30` documents `⌘G` / `Ctrl+G`, but no handler for it exists anywhere. Either
       implement it through a `manifest.json` `commands` entry or remove the claim from both places.
 

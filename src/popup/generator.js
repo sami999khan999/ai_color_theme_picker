@@ -1,20 +1,8 @@
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
-const performInitialScan = async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.id || tab.url.startsWith('chrome://')) return;
-
-    try {
-        const [{ result: pageColors }] = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: extractColorsFunc
-        });
-    } catch (e) {
-        // Silently fail initial scan
-    }
-};
-
 const handleGenerate = async () => {
+    if (isGenerating) return;
+
     if (!geminiApiKey) {
         showWarning("Missing API Key. Please click the gear icon to set it.");
         return;
@@ -107,8 +95,8 @@ Format Example (ONLY for structure, DO NOT use these specific values. Use correc
   --accent: <color>;
   --accent-foreground: <color>;
   --destructive: <color>;
-  --border: <color> / <opacity>;
-  --input: <color> / <opacity>;
+  --border: <color>;
+  --input: <color>;
   --ring: <color>;
   --chart-1: <color>;
   --chart-2: <color>;
@@ -121,7 +109,7 @@ Format Example (ONLY for structure, DO NOT use these specific values. Use correc
   --sidebar-primary-foreground: <color>;
   --sidebar-accent: <color>;
   --sidebar-accent-foreground: <color>;
-  --sidebar-border: <color> / <opacity>;
+  --sidebar-border: <color>;
   --sidebar-ring: <color>;
 }
 
@@ -141,8 +129,8 @@ Format Example (ONLY for structure, DO NOT use these specific values. Use correc
   --accent: <color>;
   --accent-foreground: <color>;
   --destructive: <color>;
-  --border: <color> / <opacity>;
-  --input: <color> / <opacity>;
+  --border: <color>;
+  --input: <color>;
   --ring: <color>;
   --chart-1: <color>;
   --chart-2: <color>;
@@ -155,7 +143,7 @@ Format Example (ONLY for structure, DO NOT use these specific values. Use correc
   --sidebar-primary-foreground: <color>;
   --sidebar-accent: <color>;
   --sidebar-accent-foreground: <color>;
-  --sidebar-border: <color> / <opacity>;
+  --sidebar-border: <color>;
   --sidebar-ring: <color>;
 }
 
@@ -163,7 +151,8 @@ Rules:
 1. CRITICAL: Prioritize the "USER STYLE PREFERENCE" at the top.
 2. Output ALL variables as FULLY WRAPPED, VALID CSS color values (e.g., oklch(L C H), rgb(R G B), hsl(H S L), etc.).
 3. DO NOT output raw numbers without the color function (e.g., DO NOT use --primary: 44 132 219; instead use --primary: rgb(44, 132, 219);).
-4. Output ONLY the raw CSS. No code blocks, no explanations.`;
+4. For translucent values (--border, --input, --sidebar-border), put the alpha INSIDE the color function, e.g. oklch(1 0 0 / 10%) or rgb(255 255 255 / 10%). Never write a color followed by a bare slash.
+5. Output ONLY the raw CSS. No code blocks, no explanations.`;
 
         const requestBody = { contents: [{ parts: [{ text: systemPrompt }] }] };
         
@@ -184,13 +173,17 @@ Rules:
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             const errMsg = errorData.error?.message || response.statusText || `HTTP Error ${response.status}`;
-            throw new Error(errMsg);
+            const httpError = new Error(errMsg);
+            httpError.status = response.status;
+            throw httpError;
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
         let buffer = '';
+        let blockReason = '';
+        let finishReason = '';
 
         try {
             while (true) {
@@ -227,6 +220,8 @@ Rules:
                             const potentialJson = buffer.substring(i, j);
                             try {
                                 const json = JSON.parse(potentialJson);
+                                blockReason = json.promptFeedback?.blockReason || blockReason;
+                                finishReason = json.candidates?.[0]?.finishReason || finishReason;
                                 if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
                                     const chunkText = json.candidates[0].content.parts[0].text;
                                     fullText += chunkText;
@@ -248,14 +243,23 @@ Rules:
             reader.releaseLock();
         }
 
+        if (blockReason) {
+            throw new Error(`Gemini blocked this request (${blockReason}). Try rephrasing your prompt.`);
+        }
+        if (!fullText.trim()) {
+            throw new Error(finishReason
+                ? `Gemini returned no content (${finishReason}). Try a different prompt.`
+                : "Gemini returned an empty response. Please try again.");
+        }
+
         const aiText = fullText.replace(/```css|```/g, '').trim();
 
-        const lightMatch = aiText.match(/:root\s*{([\s\S]+?)}/);
-        const darkMatch = aiText.match(/\.dark\s*{([\s\S]+?)}/);
+        const light = extractCssBlock(aiText, ':root');
+        const dark = extractCssBlock(aiText, '.dark');
 
-        if (lightMatch && darkMatch) {
-            themes.light = lightMatch[1].trim();
-            themes.dark = darkMatch[1].trim();
+        if (light && dark) {
+            themes.light = light;
+            themes.dark = dark;
             
             renderPalette(themes.light, results.lightPalette);
             renderPalette(themes.dark, results.darkPalette);
@@ -286,7 +290,7 @@ const initGeneratorListeners = () => {
     controls.generateBtn.onclick = handleGenerate;
 
     controls.userPrompt.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey || e.shiftKey) && e.key === 'Enter') {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
             handleGenerate();
         }

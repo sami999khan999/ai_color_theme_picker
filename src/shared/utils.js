@@ -1,51 +1,87 @@
 const getFriendlyError = (error) => {
-    const msg = (error.message || '').toLowerCase();
-    
-    // Network errors
-    if (msg.includes('failed to fetch') || msg.includes('network')) {
+    // A status code captured at the fetch site is authoritative. Substring
+    // matching on the message is only a fallback for failures that never
+    // produced a response, because matching on words like "key" or "limit"
+    // misreports any unrelated error that happens to contain them.
+    const status = error && error.status;
+
+    if (status === 400) {
+        return "Gemini rejected the request as malformed. Please try a different prompt.";
+    }
+    if (status === 401 || status === 403) {
+        return "Invalid API Key. Please click the gear icon to reset it.";
+    }
+    if (status === 404) {
+        return "The requested Gemini model is not available for this key or region.";
+    }
+    if (status === 429) {
+        return "Quota exhausted. Please try again later or switch to a different API key.";
+    }
+    if (status >= 500) {
+        return "Gemini is currently busy. Please try again in a few seconds.";
+    }
+
+    if (error && error.name === 'AbortError') {
+        return "The request timed out or was cancelled.";
+    }
+
+    const msg = (error && error.message || '').toLowerCase();
+
+    if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
         return "Connection failed. Please check your internet.";
     }
 
-    // Quota / Rate Limit detection
-    const isQuotaWarning = msg.includes('quota') || msg.includes('limit') || msg.includes('429') || msg.includes('exhausted') || msg.includes('exceeded');
-    
-    if (isQuotaWarning) {
-        return "Quota is expired! Please try again tomorrow or use a different API key.";
-    }
-
-    // Auth / API Key
-    if (msg.includes('key') || msg.includes('401') || msg.includes('403')) {
-        return "Invalid API Key. Please click the ⚙️ icon to reset it.";
-    }
-
-    // Model issues
-    if (msg.includes('model') && (msg.includes('not found') || msg.includes('404'))) {
-        return "Model 'gemini-2.5-flash' not found (404). Please ensure this model is available in your region or try again later.";
-    }
-
-    // Server issues
-    if (msg.includes('500') || msg.includes('503') || msg.includes('overloaded')) {
-        return "Gemini is currently busy. Please try again in 10 seconds.";
-    }
-
-    // Safety / Content
-    if (msg.includes('safety') || msg.includes('blocked')) {
-        return "The request was blocked by AI safety filters. Try a different prompt.";
-    }
-
-    // Catch-all for other errors, ensuring we show the original message if possible
-    if (error.message && error.message.length > 0) {
+    if (error && error.message) {
         return error.message;
     }
 
     return "An unexpected error occurred. Please check the console for details.";
 };
 
+// Reads the body of a CSS rule by counting braces. The previous non-greedy
+// regex stopped at the first "}", so a nested block or an @media wrapper in the
+// model's output silently truncated the theme to a fragment while still
+// reporting success.
+const extractCssBlock = (css, selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const opening = new RegExp(escaped + '\\s*\\{');
+    const match = opening.exec(css);
+    if (!match) return null;
+
+    const bodyStart = match.index + match[0].length;
+    let depth = 1;
+
+    for (let i = bodyStart; i < css.length; i++) {
+        const char = css[i];
+        if (char === '{') {
+            depth++;
+        } else if (char === '}') {
+            depth--;
+            if (depth === 0) return css.slice(bodyStart, i).trim();
+        }
+    }
+
+    // Unbalanced: the stream was cut off mid-block.
+    return null;
+};
+
 const copyToClipboard = (text, element) => {
+    // The label is cached on the element the first time round. Reading
+    // innerHTML at click time meant a second click inside the timeout window
+    // captured the "Copied" markup as the original and relabelled the button
+    // permanently.
+    if (element.dataset.label === undefined) {
+        element.dataset.label = element.innerHTML;
+    }
+    if (element.dataset.copyPending === '1') return;
+
     navigator.clipboard.writeText(text).then(() => {
-        const original = element.innerHTML;
+        element.dataset.copyPending = '1';
         element.innerHTML = '<span class="copy-feedback">Copied</span>';
-        setTimeout(() => element.innerHTML = original, 1500);
+        setTimeout(() => {
+            element.innerHTML = element.dataset.label;
+            delete element.dataset.copyPending;
+        }, 1500);
     }).catch(() => showError(new Error("Copy failed")));
 };
 

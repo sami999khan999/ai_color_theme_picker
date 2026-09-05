@@ -70,7 +70,7 @@
                         <div>
                             <span class="label">Prompt </span> <span class="hint">(Optional)</span>
                         </div>
-                        <span class="hint">Shift + Enter to generate</span>
+                        <span class="hint" id="shortcut-hint">Ctrl + Enter to generate</span>
                     </div>
                     <textarea id="user-prompt" placeholder="Modern SaaS dashboard with slate colors..."></textarea>
                     
@@ -97,7 +97,7 @@
                     <button id="generate-btn" class="generate-trigger">
                         <div id="btn-content">
                             <span>Generate Theme</span>
-                            <kbd>⌘G</kbd>
+                            <kbd id="shortcut-kbd">Ctrl↵</kbd>
                         </div>
                         <div id="spinner" class="spinner hidden"></div>
                         <div id="arrow-icon" class="icon-wrapper">

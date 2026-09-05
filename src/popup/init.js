@@ -1,5 +1,20 @@
+const isMacPlatform = () => /mac|iphone|ipad/i.test(
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent
+);
+
+const applyShortcutLabels = () => {
+    const modifier = isMacPlatform() ? '\u2318' : 'Ctrl';
+    if (controls.shortcutHint) {
+        controls.shortcutHint.textContent = `${modifier} + Enter to generate`;
+    }
+    if (controls.shortcutKbd) {
+        controls.shortcutKbd.textContent = `${modifier}\u21B5`;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize component logic
+    applyShortcutLabels();
     initDropdown();
     initApiKeyListeners();
     initGeneratorListeners();
@@ -21,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 chrome.storage.local.set({ apiKeys });
             }
             showView('main');
-            performInitialScan();
         } else {
             showView('setup');
         }
@@ -33,10 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
     results.copyDark.onclick = () => copyToClipboard(`.dark {\n  ${themes.dark}\n}`, results.copyDark);
     results.copyFull.onclick = () => copyToClipboard(`:root {\n  ${themes.light}\n}\n\n.dark {\n  ${themes.dark}\n}`, results.copyFull);
 
-    // Global Error Handling to prevent "breaking errors"
+    // Show errors in the UI instead of letting them break the popup silently.
+    // The handler deliberately does NOT return true: returning true cancels the
+    // default logging, which made every runtime error invisible in DevTools.
     window.onerror = (message, source, lineno, colno, error) => {
         showError(error || new Error(message));
-        return true; 
     };
 
     window.onunhandledrejection = (event) => {

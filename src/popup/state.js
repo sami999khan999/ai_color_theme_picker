@@ -25,6 +25,8 @@ const controls = {
     statusText: document.getElementById('system-status'),
     generatingPreview: document.getElementById('generating-preview'),
     liveCodeStream: document.getElementById('live-code-stream'),
+    shortcutHint: document.getElementById('shortcut-hint'),
+    shortcutKbd: document.getElementById('shortcut-kbd'),
 };
 
 const customDropdown = {
