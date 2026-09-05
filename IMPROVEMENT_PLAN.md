@@ -158,28 +158,28 @@ complete theme; a safety-blocked response reports the block reason.
 
 > **Goal:** stop the page scan from freezing large tabs, and make the network call resilient.
 
-- [ ] 🟠 **Make the color scan fast.** `src/shared/utils.js:98-108` calls
+- [x] 🟠 **Make the color scan fast.** `src/shared/utils.js:98-108` calls
       `document.querySelectorAll('*')`, runs `getComputedStyle` on every element, and for each of five
       properties calls `toHex` — which does a canvas `fillRect` plus a `getImageData` round-trip
       (`utils.js:66-71`). On a 10,000-element page that is ~50,000 `getImageData` calls, each of which
       forces a readback: seconds of blocked main thread on a page the user is looking at. Three fixes,
       in order of impact:
-  - [ ] Memoize `toHex` in a `Map` keyed on the raw color string. Real pages reuse a handful of colors
+  - [x] Memoize `toHex` in a `Map` keyed on the raw color string. Real pages reuse a handful of colors
         across thousands of elements, so the hit rate is very high and this alone removes most of the
         cost.
-  - [ ] Bail out before touching the canvas for `transparent`, `none`, and `rgba(0, 0, 0, 0)` — the
+  - [x] Bail out before touching the canvas for `transparent`, `none`, and `rgba(0, 0, 0, 0)` — the
         guard at `utils.js:63` already identifies them but still falls through for everything else.
-  - [ ] Stop traversing once the 60-color cap at `utils.js:115` is reached, rather than scanning every
+  - [x] Stop traversing once the 60-color cap at `utils.js:115` is reached, rather than scanning every
         element and slicing at the end.
-- [ ] 🟡 **Switch the stream to `?alt=sse`.** `src/popup/generator.js:171` omits it, so the response is
+- [x] 🟡 **Switch the stream to `?alt=sse`.** `src/popup/generator.js:171` omits it, so the response is
       a raw JSON array. That forces the 55-line hand-rolled brace-matching scanner at
       `generator.js:196-238`, which additionally restarts its scan from index 0 after every extracted
       object. Appending `&alt=sse` yields newline-delimited `data:` frames and lets most of that code
       be deleted.
-- [ ] 🟡 **Add a timeout and cancellation.** The fetch at `generator.js:171` has no `AbortController`.
+- [x] 🟡 **Add a timeout and cancellation.** The fetch at `generator.js:171` has no `AbortController`.
       A stalled stream leaves the spinner spinning with no way out but closing the popup. Add a
       timeout, and wire the controller to a Cancel button in the generating view.
-- [ ] 🟢 **Retry transient failures.** `src/shared/utils.js:27` already has user-facing copy for
+- [x] 🟢 **Retry transient failures.** `src/shared/utils.js:27` already has user-facing copy for
       "Gemini is currently busy" — back it with an actual retry-with-backoff on `429` and `503`.
 
 **Exit criteria:** scanning a large content-heavy page (e.g. a long Wikipedia article) completes

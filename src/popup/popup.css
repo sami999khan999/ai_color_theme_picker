@@ -827,3 +827,22 @@ code { font-size: 0.65rem; color: var(--muted); background: var(--bg); padding: 
   color: var(--success);
   font-weight: 700;
 }
+
+.cancel-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.cancel-btn:hover,
+.cancel-btn:focus-visible {
+  color: var(--fg);
+  border-color: var(--muted);
+}

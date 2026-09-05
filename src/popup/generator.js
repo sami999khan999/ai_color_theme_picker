@@ -1,4 +1,49 @@
 const GEMINI_MODEL = 'gemini-2.5-flash';
+// Abort if the stream goes quiet for this long. Measured between chunks rather
+// than over the whole request, so a slow-but-alive generation is not cut off.
+const STREAM_IDLE_TIMEOUT_MS = 30000;
+const RETRY_STATUSES = [429, 503];
+const MAX_ATTEMPTS = 3;
+
+let activeController = null;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retries only the request itself, before the body is consumed: once chunks
+// have been rendered a retry would duplicate them.
+const requestThemeStream = async (requestBody, signal) => {
+    let lastError;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Sent as a header rather than a ?key= query parameter so the
+                // key stays out of anything that records request URLs.
+                'x-goog-api-key': geminiApiKey
+            },
+            body: JSON.stringify(requestBody),
+            signal
+        });
+
+        if (response.ok) return response;
+
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData.error?.message || response.statusText || `HTTP Error ${response.status}`;
+        lastError = new Error(message);
+        lastError.status = response.status;
+
+        const isLastAttempt = attempt === MAX_ATTEMPTS - 1;
+        if (!RETRY_STATUSES.includes(response.status) || isLastAttempt) throw lastError;
+
+        const backoffMs = 1000 * Math.pow(2, attempt);
+        updateStatus(`Gemini is busy, retrying in ${backoffMs / 1000}s...`);
+        await sleep(backoffMs);
+    }
+
+    throw lastError;
+};
 
 const handleGenerate = async () => {
     if (isGenerating) return;
@@ -159,88 +204,63 @@ Rules:
         controls.generatingPreview.classList.remove('hidden');
         controls.liveCodeStream.textContent = '';
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Sent as a header rather than a ?key= query parameter so the
-                // key stays out of anything that records request URLs.
-                'x-goog-api-key': geminiApiKey
-            },
-            body: JSON.stringify(requestBody)
-        });
+        const controller = new AbortController();
+        activeController = controller;
+        let idleTimer = null;
+        const resetIdleTimer = () => {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+        };
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            const errMsg = errorData.error?.message || response.statusText || `HTTP Error ${response.status}`;
-            const httpError = new Error(errMsg);
-            httpError.status = response.status;
-            throw httpError;
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
         let fullText = '';
         let buffer = '';
         let blockReason = '';
         let finishReason = '';
 
         try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            resetIdleTimer();
+            const response = await requestThemeStream(requestBody, controller.signal);
 
-                buffer += decoder.decode(value, { stream: true });
-                
-                let i = 0;
-                while (i < buffer.length) {
-                    if (buffer[i] === '{') {
-                        let braceCount = 0;
-                        let j = i;
-                        let inString = false;
-                        let escaped = false;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-                        while (j < buffer.length) {
-                            const char = buffer[j];
-                            if (escaped) {
-                                escaped = false;
-                            } else if (char === '\\') {
-                                escaped = true;
-                            } else if (char === '"') {
-                                inString = !inString;
-                            } else if (!inString) {
-                                if (char === '{') braceCount++;
-                                else if (char === '}') braceCount--;
-                            }
-                            j++;
-                            if (braceCount === 0) break;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    resetIdleTimer();
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    const { payloads, remainder } = splitSseFrames(buffer);
+                    buffer = remainder;
+
+                    for (const payload of payloads) {
+                        let json;
+                        try {
+                            json = JSON.parse(payload);
+                        } catch (e) {
+                            console.warn('AI Theme Picker: skipping unparsable stream frame', e);
+                            continue;
                         }
 
-                        if (braceCount === 0) {
-                            const potentialJson = buffer.substring(i, j);
-                            try {
-                                const json = JSON.parse(potentialJson);
-                                blockReason = json.promptFeedback?.blockReason || blockReason;
-                                finishReason = json.candidates?.[0]?.finishReason || finishReason;
-                                if (json.candidates?.[0]?.content?.parts?.[0]?.text) {
-                                    const chunkText = json.candidates[0].content.parts[0].text;
-                                    fullText += chunkText;
-                                    controls.liveCodeStream.textContent = fullText;
-                                    controls.liveCodeStream.parentElement.scrollTop = controls.liveCodeStream.parentElement.scrollHeight;
-                                }
-                            } catch (e) {}
-                            buffer = buffer.substring(j);
-                            i = 0;
-                        } else {
-                            break; 
+                        blockReason = json.promptFeedback?.blockReason || blockReason;
+                        finishReason = json.candidates?.[0]?.finishReason || finishReason;
+
+                        const chunkText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (chunkText) {
+                            fullText += chunkText;
+                            controls.liveCodeStream.textContent = fullText;
+                            controls.liveCodeStream.parentElement.scrollTop = controls.liveCodeStream.parentElement.scrollHeight;
                         }
-                    } else {
-                        i++;
                     }
                 }
+            } finally {
+                reader.releaseLock();
             }
         } finally {
-            reader.releaseLock();
+            clearTimeout(idleTimer);
+            activeController = null;
         }
 
         if (blockReason) {
@@ -270,7 +290,12 @@ Rules:
             throw new Error("I received the theme data but couldn't parse the CSS colors. Please try a different prompt or check the console.");
         }
     } catch (err) {
-        showError(err);
+        // A cancel or idle-timeout is a user-facing notice, not a failure.
+        if (err && err.name === 'AbortError') {
+            showWarning("Generation cancelled.");
+        } else {
+            showError(err);
+        }
     } finally {
         isGenerating = false;
         controls.generateBtn.disabled = false;
@@ -288,6 +313,12 @@ const initGeneratorListeners = () => {
     };
 
     controls.generateBtn.onclick = handleGenerate;
+
+    if (controls.cancelGenerate) {
+        controls.cancelGenerate.onclick = () => {
+            if (activeController) activeController.abort();
+        };
+    }
 
     controls.userPrompt.addEventListener('keydown', (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {

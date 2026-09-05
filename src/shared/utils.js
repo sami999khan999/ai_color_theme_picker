@@ -65,6 +65,24 @@ const extractCssBlock = (css, selector) => {
     return null;
 };
 
+// Splits an accumulated alt=sse buffer into complete frame payloads. Frames are
+// newline-delimited, so everything up to the last newline is complete and the
+// remainder is carried into the next chunk.
+const splitSseFrames = (buffer) => {
+    const lines = buffer.split('\n');
+    const remainder = lines.pop();
+    const payloads = [];
+
+    for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        payloads.push(payload);
+    }
+
+    return { payloads, remainder };
+};
+
 const copyToClipboard = (text, element) => {
     // The label is cached on the element the first time round. Reading
     // innerHTML at click time meant a second click inside the timeout window
@@ -95,9 +113,9 @@ const extractColorsFunc = () => {
     canvas.width = canvas.height = 1;
     const ctx = canvas.getContext('2d');
 
-    const toHex = (color) => {
-        if (!color || color === 'transparent' || color === 'none' || color === 'rgba(0, 0, 0, 0)') return null;
-        
+    const hexCache = new Map();
+
+    const computeHex = (color) => {
         // Fallback for cases where canvas might be blocked by CSP
         try {
             if (!ctx) throw new Error("Canvas blocked");
@@ -115,6 +133,15 @@ const extractColorsFunc = () => {
         }
     };
 
+    const toHex = (color) => {
+        if (!color || color === 'transparent' || color === 'none' || color === 'rgba(0, 0, 0, 0)') return null;
+        if (hexCache.has(color)) return hexCache.get(color);
+
+        const hex = computeHex(color);
+        hexCache.set(color, hex);
+        return hex;
+    };
+
     const getVar = (name) => {
         const val = window.getComputedStyle(root).getPropertyValue(name).trim();
         return val ? toHex(val) : null;
@@ -127,27 +154,30 @@ const extractColorsFunc = () => {
         if (val) vars[v] = val;
     });
 
+    const MAX_COLORS = 60;
     const colorProperties = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
     const colorSet = new Set();
-    
-    // Get ALL elements on the page (mimics Chrome CSS Overview)
+
+    // Walks the document the way Chrome's CSS Overview does, but stops as soon
+    // as the cap is reached rather than visiting every element and slicing at
+    // the end. getComputedStyle is the expensive part, so not calling it is the
+    // only real saving available here.
     const allElements = document.querySelectorAll('*');
 
-    allElements.forEach(el => {
-        const style = window.getComputedStyle(el);
-        
-        colorProperties.forEach(prop => {
-            const value = style[prop];
-            const hex = toHex(value);
+    for (let i = 0; i < allElements.length && colorSet.size < MAX_COLORS; i++) {
+        const style = window.getComputedStyle(allElements[i]);
+
+        for (let p = 0; p < colorProperties.length; p++) {
+            const hex = toHex(style[colorProperties[p]]);
             if (hex) colorSet.add(hex);
-        });
-    });
+        }
+    }
 
     return {
         bg: toHex(window.getComputedStyle(body).backgroundColor) || '#ffffff',
         text: toHex(window.getComputedStyle(body).color) || '#000000',
         accent: getVar('--primary') || toHex(window.getComputedStyle(btn || body).backgroundColor) || '#000000',
         variables: vars,
-        palette: Array.from(colorSet).slice(0, 60) // Limit to 60 colors to avoid prompt bloat
+        palette: Array.from(colorSet)
     };
 };
