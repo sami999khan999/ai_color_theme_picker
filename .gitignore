@@ -7,3 +7,9 @@ npm-debug.log*
 # dist/popup.js is intentionally committed: popup.html loads it directly, so
 # `Load unpacked` has to work from a clean clone. `npm run check:dist` guards
 # against it drifting from src/.
+
+# Personal, machine-local Claude Code overrides (permission grants and the
+# like). Deliberately untracked: committing it would apply one developer's
+# permission grants to everyone who clones the repo. Shared project-level
+# settings belong in .claude/settings.json instead.
+.claude/settings.local.json
