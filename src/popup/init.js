@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load API Keys and perform initial scan
     chrome.storage.local.get(['geminiApiKey', 'apiKeys'], (result) => {
-        let rawKeys = result.apiKeys || [];
+        const rawKeys = result.apiKeys || [];
         // Migration: Convert string keys to objects if necessary
         apiKeys = rawKeys.map(k => {
             if (typeof k === 'string') return { key: k, name: 'Imported Key' };

@@ -123,7 +123,7 @@ const extractColorsFunc = () => {
             ctx.fillRect(0, 0, 1, 1);
             const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
             return "#" + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join("").toUpperCase();
-        } catch (e) {
+        } catch {
             // Secondary fallback: regex for rgb/rgba (limited accuracy for lab/oklch)
             const rgb = color.match(/\d+/g);
             if (rgb && rgb.length >= 3) {

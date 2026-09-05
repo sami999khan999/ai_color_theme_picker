@@ -97,7 +97,7 @@ const renderPalette = (cssString, container) => {
     const regex = /(--[\w-]+):\s*([^;]+);/g;
     let match;
     while ((match = regex.exec(cssString)) !== null) {
-        const [_, name, value] = match;
+        const [, name, value] = match;
         if (name === '--radius') continue;
 
         const swatch = document.createElement('div');

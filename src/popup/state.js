@@ -49,6 +49,6 @@ const results = {
 let selectedFormatValue = 'oklch';
 let geminiApiKey = '';
 let apiKeys = [];
-let themes = { light: '', dark: '' };
+const themes = { light: '', dark: '' };
 let currentView = '';
 let isGenerating = false;
