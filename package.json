@@ -1,0 +1,22 @@
+{
+  "name": "ai-color-theme-picker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that analyses a page's colours and generates Tailwind/shadcn CSS variables with Gemini.",
+  "scripts": {
+    "build": "node build.js",
+    "check:dist": "node scripts/check-dist.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test test/*.test.js",
+    "verify": "npm run build && npm run lint && npm test"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "prettier": "^3.4.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

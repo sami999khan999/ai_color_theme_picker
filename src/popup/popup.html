@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Theme AI</title>
     <link rel="stylesheet" href="popup.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="linear-theme">
     <div class="glow-bg"></div>
@@ -19,7 +16,7 @@
                 </div>
                 <div class="brand-text">
                     <h1>Theme AI</h1>
-                    <div class="badge" style="margin-top:2px; width: fit-content">v1.0</div>
+                    <div class="badge badge-version">v1.0</div>
                 </div>
             </div>
             <button id="reset-api" class="settings-trigger" title="Settings">
@@ -49,6 +46,14 @@
                             <input type="password" id="api-key" placeholder="Paste your key here...">
                         </div>
                     </div>
+                    <div class="field">
+                        <label for="model-select">Model</label>
+                        <select id="model-select" class="model-select">
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash — fast, default</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro — higher quality</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — cheapest</option>
+                        </select>
+                    </div>
                     <button id="save-key" class="action-btn primary">
                         <span>Initialize</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
@@ -73,26 +78,27 @@
                         <div>
                             <span class="label">Prompt </span> <span class="hint">(Optional)</span>
                         </div>
-                        <span class="hint">Shift + Enter to generate</span>
+                        <span class="hint" id="shortcut-hint">Ctrl + Enter to generate</span>
                     </div>
                     <textarea id="user-prompt" placeholder="Modern SaaS dashboard with slate colors..."></textarea>
                     
                     <div class="format-selector-wrapper">
                         <label>Color Format</label>
                         <div id="custom-dropdown" class="custom-dropdown">
-                            <div id="dropdown-header" class="dropdown-header">
+                            <button type="button" id="dropdown-header" class="dropdown-header"
+                                    aria-haspopup="listbox" aria-expanded="false" aria-controls="dropdown-options">
                                 <div class="header-main">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="dropdown-leaf"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
                                     <span id="selected-format-label">OKLCH (Modern)</span>
                                 </div>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chevron"><path d="m6 9 6 6 6-6"/></svg>
-                            </div>
-                            <div id="dropdown-options" class="dropdown-options hidden">
-                                <div class="option active" data-value="oklch">OKLCH (Modern)</div>
-                                <div class="option" data-value="hex">HEX</div>
-                                <div class="option" data-value="rgb">RGB</div>
-                                <div class="option" data-value="hsl">HSL</div>
-                                <div class="option" data-value="lch">LCH</div>
+                            </button>
+                            <div id="dropdown-options" class="dropdown-options hidden" role="listbox" aria-label="Color format">
+                                <div class="option active" role="option" tabindex="-1" aria-selected="true" data-value="oklch">OKLCH (Modern)</div>
+                                <div class="option" role="option" tabindex="-1" aria-selected="false" data-value="hex">HEX</div>
+                                <div class="option" role="option" tabindex="-1" aria-selected="false" data-value="rgb">RGB</div>
+                                <div class="option" role="option" tabindex="-1" aria-selected="false" data-value="hsl">HSL</div>
+                                <div class="option" role="option" tabindex="-1" aria-selected="false" data-value="lch">LCH</div>
                             </div>
                         </div>
                     </div>
@@ -100,7 +106,7 @@
                     <button id="generate-btn" class="generate-trigger">
                         <div id="btn-content">
                             <span>Generate Theme</span>
-                            <kbd>⌘G</kbd>
+                            <kbd id="shortcut-kbd">Ctrl↵</kbd>
                         </div>
                         <div id="spinner" class="spinner hidden"></div>
                         <div id="arrow-icon" class="icon-wrapper">
@@ -109,9 +115,17 @@
                     </button>
                 </div>
 
+                <div id="history-section" class="history-section hidden">
+                    <div class="section-divider">
+                        <span>Recent Themes</span>
+                    </div>
+                    <div id="history-list" class="history-list"></div>
+                </div>
+
                 <div id="generating-preview" class="generating-preview hidden">
                     <div class="preview-header">
                         <span>AI is crafting your theme...</span>
+                        <button type="button" id="cancel-generate" class="cancel-btn">Cancel</button>
                     </div>
                     <div class="code-stream-wrapper">
                         <pre id="live-code-stream"></pre>
@@ -162,9 +176,30 @@
                     </div>
                 </div>
 
-                <button id="copy-full" class="full-export">
-                    <span>Export Full CSS</span>
+                <div class="contrast-report">
+                    <div class="palette-label">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor" stroke="none"/></svg>
+                        <span>Contrast (WCAG AA)</span>
+                        <span id="contrast-summary" class="contrast-summary"></span>
+                    </div>
+                    <div id="contrast-list" class="contrast-list"></div>
+                </div>
+
+                <button type="button" id="preview-toggle" class="preview-toggle" aria-pressed="false">
+                    <span id="preview-toggle-label">Preview on this page</span>
                 </button>
+
+                <div class="export-row">
+                    <button id="copy-full" class="full-export">
+                        <span>Export CSS</span>
+                    </button>
+                    <button id="copy-tailwind" class="full-export subtle">
+                        <span>Tailwind v4</span>
+                    </button>
+                    <button id="copy-json" class="full-export subtle">
+                        <span>JSON</span>
+                    </button>
+                </div>
 
                 <button id="start-over" class="back-link">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -174,7 +209,10 @@
         </main>
 
         <footer class="app-footer">
-            <div id="error-display" class="error-strip hidden"></div>
+            <div id="error-display" class="error-strip hidden" role="alert" aria-live="assertive">
+                <span id="error-text"></span>
+                <button type="button" id="error-dismiss" class="error-dismiss" aria-label="Dismiss message">&times;</button>
+            </div>
             <div class="status-bar">
                 <span class="status-dot"></span>
                 <span id="system-status">System Ready</span>

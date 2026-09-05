@@ -1,0 +1,8 @@
+{
+  "printWidth": 100,
+  "tabWidth": 4,
+  "singleQuote": true,
+  "overrides": [
+    { "files": ["*.css", "*.html", "*.json", "*.yml", "*.md"], "options": { "tabWidth": 2 } }
+  ]
+}

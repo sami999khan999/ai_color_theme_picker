@@ -1,78 +1,148 @@
 # Color Theme Picker (Theme AI)
 
-A premium, AI-powered Chrome extension designed to help developers and designers craft perfect color palettes. It analyzes your current website's brand identity and uses Gemini AI to generate harmonious Tailwind CSS variables for both light and dark modes.
+A Chrome extension for developers and designers. It analyses the colours of the
+page you are on and asks Gemini to generate a matching set of Tailwind /
+shadcn-ui CSS variables for both light and dark mode.
 
-## 🚀 Key Features
+## Features
 
-### 1. Intelligent Context Awareness
-- **Site Analysis**: Automatically extracts dominant colors, active CSS variables, and the full color palette from any open tab.
-- **Brand Synergy**: Uses the extracted data as a foundation to ensure generated themes remain consistent with your existing brand identity.
-- **Modern Color Formats**: Seamlessly converts and generates colors in **OKLCH (Modern)**, HEX, RGB, HSL, and LCH.
+### Site-aware colour analysis
+- Scans the active tab for its computed colours and any shadcn CSS variables it
+  already defines, and uses them as the starting point for the theme.
+- Normalises every CSS colour format — named colours, `lab()`, `oklch()` and the
+  rest — to sRGB hex through a canvas round-trip, with a regex fallback for
+  pages whose CSP blocks canvas.
+- Generates output in **OKLCH**, HEX, RGB, HSL, or LCH.
 
-### 2. AI-Powered Theme Crafting
-- **Gemini Integration**: Leverages the high-performance Gemini 1.5 Flash model to interpret complex styling prompts.
-- **Priority Prompts**: Fine-tune your results with custom prompts (e.g., "Sleek SaaS dashboard with slate tones" or "Vibrant cyberpunk neon").
-- **Live Stream Preview**: Watch in real-time as the AI "crafts" your CSS variables with a dynamic code-streaming interface.
+### AI theme generation
+- Uses Google's Gemini — **`gemini-2.5-flash`** by default, switchable to Pro or
+  Flash-Lite in settings.
+- Takes an optional style prompt ("Sleek SaaS dashboard with slate tones",
+  "Vibrant cyberpunk neon") which is prioritised over the scraped palette.
+- Streams the response so you can watch the CSS being written, and can be
+  cancelled mid-generation.
 
-### 3. Tailwind CSS & shadcn/ui Ready
-- **Full Variable Set**: Generates a comprehensive list of variables including `--background`, `--primary`, `--accent`, `--muted`, and more.
-- **Dual Mode Support**: Instantly provides optimized configurations for both `:root` (Light) and `.dark` (Dark) modes.
-- **One-Click Export**: Copy individual light/dark blocks or the entire CSS configuration with a single click.
+### Accessibility checking
+- Every foreground/background pair in the generated theme is measured against
+  **WCAG AA**, in both light and dark mode, with failures listed first. The model
+  is not reliable at contrast, and an inaccessible theme is a broken theme.
 
-### 4. Advanced Key Management
-- **Secure Profiles**: Store and manage multiple Gemini API keys with descriptive names (e.g., "Personal", "Work").
-- **Easy Setup**: Direct links to Google AI Studio to help you get started with a free key in seconds.
-- **Quick Reset**: Easily switch or clear your keys through the integrated settings menu.
+### Live preview
+- Apply the generated theme to the page you are on before you copy it, and
+  revert it with the same button.
 
-### 5. Premium UI/UX
-- **Modern Aesthetic**: A sleek, dark-themed interface built with Inter and Plus Jakarta Sans typography.
-- **Interactive Previews**: Instantly visualize your generated colors with live swatch grids for both light and dark modes.
-- **Keyboard Optimized**: Use `⌘G` (macOS) or `Ctrl+G` (Windows/Linux) to trigger generation instantly.
+### Tailwind and shadcn/ui ready
+- Emits the full shadcn variable set — `--background`, `--primary`, `--accent`,
+  `--muted`, `--chart-1..5`, `--sidebar-*` and the rest.
+- Produces both a `:root` (light) and a `.dark` block.
+- Copy either block on its own, export the whole thing, or export as a
+  Tailwind v4 `@theme inline` block or JSON.
+
+### Key management
+- Store several Gemini API keys under names like "Personal" or "Work" and switch
+  between them.
+- Links straight to Google AI Studio to get a free key.
+
+### Keyboard
+- **Ctrl+Enter** (**⌘+Enter** on macOS) generates a theme from the prompt box.
 
 ---
 
-## 🛠 Technical Architecture
+## Technical architecture
 
-The project follows a modular, dependency-free architecture to ensure maximum performance and maintainability.
+No runtime dependencies. Plain browser JavaScript, hand-written CSS, inline SVG.
 
-- **`src/shared/`**: Contains core utilities for color normalization (Canvas-based rendering) and the centralized `icons.js` library.
-- **`src/popup/`**: The main application layer, handling `state.js` management, `generator.js` AI logic, and `ui.js` view transitions.
-- **`src/content/`**: High-performance scripts for non-invasive DOM scanning and color extraction.
-- **`src/init/`**: Bootstrapping logic and application initialization.
+- **`src/shared/`** — code used across the extension: `icons.js` holds the inline
+  SVG set; `utils.js` holds error formatting, CSS block extraction, SSE frame
+  splitting, clipboard handling, and `extractColorsFunc`, the routine injected
+  into the page to collect its colours.
+- **`src/popup/`** — the application itself: `state.js` (DOM handles and shared
+  state), `ui.js` (view switching, palette rendering, the format dropdown),
+  `api-keys.js` (key storage and the saved-key list), `generator.js` (prompt
+  construction, the Gemini request, stream parsing), and `init.js` (bootstrap
+  and event wiring).
+- **`dist/popup.js`** — the generated bundle that `popup.html` actually loads.
+- **`test/`** — `node:test` suites for the pure logic.
 
-### Optimization & Build
-To maintain a small footprint without external dependencies, the project uses a custom **`build.js`** environment:
-- **Concatenation**: Merges 7 modular source files into a single, optimized `dist/popup.js`.
-- **Dependency Flow**: Enforces a strict order of operations (Shared Utils → State → UI → Generator).
-- **Native APIs**: Built entirely on standard Web APIs and Chrome Extension Manifest V3.
+### Build
+
+`build.js` concatenates the seven source files, in dependency order, into
+`dist/popup.js`. There is no transpiling, minification, or module system: the
+files share a single global scope, which is why the order in `JS_FILES` matters.
+
+The build is deterministic — the same sources always produce a byte-identical
+bundle — so CI can verify that the committed bundle matches `src/`.
+
+> **`dist/popup.js` is committed on purpose.** `popup.html` loads it directly, so
+> `Load unpacked` has to work from a clean clone. The consequence is that
+> **editing `src/` without rebuilding changes nothing at runtime.** Always run
+> `npm run build` and commit the result.
 
 ---
 
-## 📦 Installation (Development)
+## Installation (development)
 
-1. Clone this repository or download the source code.
-2. Ensure you have [Node.js](https://nodejs.org/) installed.
-3. Run the optimized build script to generate the production bundle:
+1. Clone the repository. [Node.js](https://nodejs.org/) 18+ is required to build.
+2. Build the bundle:
    ```bash
-   node build.js
+   npm install     # only needed for linting and tests
+   npm run build
    ```
-4. Open Chrome and navigate to `chrome://extensions`.
-5. Enable **Developer mode** in the top-right corner.
-6. Click **Load unpacked** and select the project root folder.
+3. Open `chrome://extensions`.
+4. Enable **Developer mode**.
+5. Click **Load unpacked** and select the project root.
+
+After any change under `src/`, run `npm run build` again and hit **Reload** on
+the extension card.
+
+### Development scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run build` | Rebuild `dist/popup.js` from `src/`. |
+| `npm test` | Run the `node:test` suites. |
+| `npm run lint` | Run ESLint over sources, the bundle, and tooling. |
+| `npm run check:dist` | Fail if the committed bundle is stale. |
+| `npm run verify` | Build, lint, and test in one go. |
+| `npm run format` | Apply Prettier. |
 
 ---
 
-## ⚙️ Customization
+## Usage
 
-Open the extension popup and click the **Gear Icon** to:
-- Add, select, or delete your **Gemini API Keys**.
-- Change the **Color Format** (OKLCH, HEX, RGB, etc.) for the next generation.
-- Clear your custom prompt and start a fresh session.
+Open the popup and click the gear icon to:
+
+- Add, switch between, or delete **Gemini API keys**.
+- Return to the generator.
+
+In the generator you can set a style prompt and pick the **colour format**. Your
+prompt, format, model and most recent theme are remembered between sessions, and
+the last five themes are listed under **Recent Themes** for one-click restore.
 
 ---
 
-## 🔒 Privacy & Local-First
+## Privacy
 
-- **Direct Communication**: The extension communicates directly with Google's Gemini API. No middle-man servers or telemetry.
-- **Local Storage**: Your API keys and settings are stored locally on your device using `chrome.storage.local`.
-- **No Tracking**: We do not track your prompts, the sites you visit, or the themes you generate.
+- **Direct to Google.** The extension talks to the Gemini API and nothing else.
+  There is no backend, no analytics, and no telemetry.
+- **Local storage.** Settings and API keys are kept in `chrome.storage.local` on
+  your machine. Note that `chrome.storage.local` is **not encrypted** — keys are
+  stored in plaintext, readable by anything with access to your Chrome profile.
+  Treat a stored key the way you would treat any credential in a config file, and
+  prefer a key scoped to this use.
+- **No third-party requests.** Fonts and assets are bundled rather than fetched
+  from a CDN, so opening the popup contacts nobody.
+- **Page access.** Colour extraction runs only on the tab you are on, only when
+  you click Generate, via the `activeTab` permission. The extension has no
+  persistent content script and requests no all-sites host permission.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Planned work is tracked in
+[IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md).
+
+## License
+
+[MIT](LICENSE)
