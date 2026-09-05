@@ -228,20 +228,20 @@ when `dist/` is stale.
 
 > **Goal:** the README currently describes a codebase that does not exist. Fix every claim.
 
-- [ ] 🟢 **Wrong model name.** `README.md:13` says "Gemini 1.5 Flash"; `src/popup/generator.js:171`
+- [x] 🟢 **Wrong model name.** `README.md:13` says "Gemini 1.5 Flash"; `src/popup/generator.js:171`
       calls `gemini-2.5-flash`.
-- [ ] 🟢 **Non-existent directory.** `README.md:41` documents `src/init/`. No such directory exists —
+- [x] 🟢 **Non-existent directory.** `README.md:41` documents `src/init/`. No such directory exists —
       the file is `src/popup/init.js`.
-- [ ] 🟢 **Wrong description of `src/content/`.** `README.md:40` calls it "high-performance scripts for
+- [x] 🟢 **Wrong description of `src/content/`.** `README.md:40` calls it "high-performance scripts for
       non-invasive DOM scanning and color extraction". The content scripts do no scanning whatsoever;
       extraction happens via `chrome.scripting.executeScript` from the popup
       (`src/popup/generator.js:49`). This section disappears with the deletion in Phase 1.
-- [ ] 🟢 **Unimplemented shortcut.** `README.md:30` documents `⌘G` / `Ctrl+G`, which does not exist
+- [x] 🟢 **Unimplemented shortcut.** `README.md:30` documents `⌘G` / `Ctrl+G`, which does not exist
       (see Phase 2).
-- [ ] 🟢 **Overstated key security.** `README.md:23` calls the key store "Secure Profiles". Keys are
+- [x] 🟢 **Overstated key security.** `README.md:23` calls the key store "Secure Profiles". Keys are
       stored unencrypted in `chrome.storage.local`. State that plainly.
-- [ ] 🟢 **Document the build-then-reload loop** prominently — editing `src/` alone has no effect.
-- [ ] 🟢 **Add `LICENSE`, `CONTRIBUTING.md`, and a `CLAUDE.md`.** None exist.
+- [x] 🟢 **Document the build-then-reload loop** prominently — editing `src/` alone has no effect.
+- [x] 🟢 **Add `LICENSE`, `CONTRIBUTING.md`, and a `CLAUDE.md`.** None exist.
 
 **Exit criteria:** every factual statement in `README.md` is verifiable against the code.
 
