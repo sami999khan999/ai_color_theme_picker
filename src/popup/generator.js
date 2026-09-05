@@ -67,6 +67,10 @@ const handleGenerate = async () => {
         return;
     }
 
+    // Both a user cancel and the idle timeout abort the same controller, so the
+    // reason has to be recorded to report them differently.
+    let streamTimedOut = false;
+
     isGenerating = true;
     controls.generateBtn.disabled = true;
     controls.btnContent.textContent = 'Crafting...';
@@ -209,7 +213,10 @@ Rules:
         let idleTimer = null;
         const resetIdleTimer = () => {
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+            idleTimer = setTimeout(() => {
+                streamTimedOut = true;
+                controller.abort();
+            }, STREAM_IDLE_TIMEOUT_MS);
         };
 
         let fullText = '';
@@ -302,7 +309,9 @@ Rules:
     } catch (err) {
         // A cancel or idle-timeout is a user-facing notice, not a failure.
         if (err && err.name === 'AbortError') {
-            showWarning("Generation cancelled.");
+            showWarning(streamTimedOut
+                ? `Gemini stopped responding for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, so the request timed out. Please try again.`
+                : "Generation cancelled.");
         } else {
             showError(err);
         }
@@ -331,15 +340,47 @@ const setPreviewLabel = (isOn) => {
     }
 };
 
-const stopPreview = async () => {
-    if (previewTabId === null) return;
+// The popup is destroyed when it closes, so preview state cannot live only in
+// memory: the injected stylesheet would stay on the tab with no way to remove
+// it. The exact CSS is stored alongside the tab id because removeCSS only
+// removes a stylesheet whose text matches what was inserted.
+const restorePreviewState = async () => {
+    const stored = await readStorage([STORAGE_KEYS.preview]);
+    const preview = stored[STORAGE_KEYS.preview];
+    if (!preview || typeof preview.tabId !== 'number') return;
 
+    // Drop the record if that tab is gone; nothing is left to clean up.
     try {
-        await chrome.scripting.removeCSS({ target: { tabId: previewTabId }, css: previewCss() });
-    } catch (e) {
-        console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+        await chrome.tabs.get(preview.tabId);
+    } catch {
+        await writeStorage({ [STORAGE_KEYS.preview]: null });
+        return;
     }
 
+    previewTabId = preview.tabId;
+    setPreviewLabel(true);
+};
+
+const stopPreview = async () => {
+    const stored = await readStorage([STORAGE_KEYS.preview]);
+    const preview = stored[STORAGE_KEYS.preview];
+
+    if (previewTabId === null && !preview) return;
+
+    const tabId = preview && typeof preview.tabId === 'number' ? preview.tabId : previewTabId;
+    // Remove the stylesheet that was actually inserted, not one recomputed from
+    // the current themes, which may have changed since.
+    const css = preview && preview.css ? preview.css : previewCss();
+
+    if (tabId !== null) {
+        try {
+            await chrome.scripting.removeCSS({ target: { tabId }, css });
+        } catch (e) {
+            console.warn('AI Theme Picker: could not remove the preview stylesheet', e);
+        }
+    }
+
+    await writeStorage({ [STORAGE_KEYS.preview]: null });
     previewTabId = null;
     setPreviewLabel(false);
 };
@@ -360,7 +401,9 @@ const togglePreview = async () => {
     }
 
     try {
-        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css: previewCss() });
+        const css = previewCss();
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, css });
+        await writeStorage({ [STORAGE_KEYS.preview]: { tabId: tab.id, css } });
         previewTabId = tab.id;
         setPreviewLabel(true);
         updateStatus('Previewing on this page');

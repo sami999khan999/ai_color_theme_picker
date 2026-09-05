@@ -183,6 +183,10 @@ const extractColorsFunc = () => {
         const style = window.getComputedStyle(allElements[i]);
 
         for (let p = 0; p < colorProperties.length; p++) {
+            // The cap is checked per property, not just per element: the outer
+            // loop alone let one element add up to five more colours after the
+            // limit was already reached.
+            if (colorSet.size >= MAX_COLORS) break;
             const hex = toHex(style[colorProperties[p]]);
             if (hex) colorSet.add(hex);
         }

@@ -126,6 +126,32 @@ const renderPalette = (cssString, container) => {
     }
 };
 
+// Puts a colour format into effect everywhere it is visible: the shared state,
+// the dropdown label, the active option and its aria-selected flag, and the
+// result badges. Three call sites used to each do a subset of this, so
+// restoring a history entry left the dropdown showing the previous format
+// while generation used the restored one.
+const applyFormatSelection = (value) => {
+    if (!value) return;
+
+    selectedFormatValue = value;
+
+    const option = customDropdown.items.find(item => item.getAttribute('data-value') === value);
+    if (option && customDropdown.label) {
+        customDropdown.label.textContent = option.textContent;
+    }
+
+    customDropdown.items.forEach((opt) => {
+        const isSelected = opt === option;
+        opt.classList.toggle('active', isSelected);
+        opt.setAttribute('aria-selected', String(isSelected));
+    });
+
+    document.querySelectorAll('.format-badge').forEach((badge) => {
+        badge.textContent = value.toUpperCase();
+    });
+};
+
 // One canvas, reused, to turn any CSS colour the browser understands into RGB.
 // CSS.supports filters out values that are not colours at all, so an
 // unparseable value is reported rather than silently scored.
@@ -213,12 +239,7 @@ const restoreTheme = (entry) => {
     themes.light = entry.light;
     themes.dark = entry.dark;
 
-    if (entry.format) {
-        selectedFormatValue = entry.format;
-        document.querySelectorAll('.format-badge').forEach(b => {
-            b.textContent = entry.format.toUpperCase();
-        });
-    }
+    applyFormatSelection(entry.format);
 
     renderPalette(themes.light, results.lightPalette);
     renderPalette(themes.dark, results.darkPalette);
@@ -262,7 +283,7 @@ const renderHistory = () => {
 // The dropdown is a listbox: it owns roving focus across its options and
 // responds to the arrow/Home/End/Enter/Escape keys a native select would.
 const initDropdown = () => {
-    const { container, header, label, options, items } = customDropdown;
+    const { container, header, options, items } = customDropdown;
     if (!header) return;
 
     const setOpen = (open) => {
@@ -276,14 +297,8 @@ const initDropdown = () => {
     };
 
     const selectItem = (item) => {
-        selectedFormatValue = item.getAttribute('data-value');
-        label.textContent = item.textContent;
-
-        items.forEach((opt) => {
-            const isSelected = opt === item;
-            opt.classList.toggle('active', isSelected);
-            opt.setAttribute('aria-selected', String(isSelected));
-        });
+        applyFormatSelection(item.getAttribute('data-value'));
+        persistPreferences();
 
         setOpen(false);
         header.focus();
