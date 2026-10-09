@@ -9,16 +9,16 @@ npm run verify   # build + lint + test
 
 ## The one thing that will catch you out
 
-`popup.html` loads `dist/popup.js`, **not** the files in `src/`. Editing a source
+`popup.html` loads `extension-build/popup.js`, **not** the files in `src/`. Editing a source
 file and reloading the extension does nothing until you rebuild:
 
 ```bash
 npm run build
 ```
 
-`dist/popup.js` is committed deliberately, so `Load unpacked` works from a clean
+`extension-build/popup.js` is committed deliberately, so `Load unpacked` works from a clean
 clone. Commit the rebuilt bundle alongside your source change — CI fails if the
-two disagree (`npm run check:dist`).
+two disagree (`npm run check:build`).
 
 ## How the code is organised
 
@@ -30,7 +30,7 @@ declared in `state.js` is visible to `generator.js`. Two consequences:
   it, at call time.
 - **Linting is split.** `no-undef`, `no-unused-vars` and `prefer-const` can only
   be judged across the whole concatenated program, so ESLint applies them to
-  `dist/popup.js`. `src/**` gets the rules that are meaningful per-file. See
+  `extension-build/popup.js`. `src/**` gets the rules that are meaningful per-file. See
   `eslint.config.js`.
 
 ## Tests
@@ -60,7 +60,7 @@ style: 4-space indent in JS, 2 in HTML/CSS/JSON.
 
 ```bash
 npm run verify
-npm run check:dist
+npm run check:build
 ```
 
 Planned work is tracked in [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md); ticking a

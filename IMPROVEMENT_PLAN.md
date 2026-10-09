@@ -9,7 +9,7 @@ full read of every source file in the repository.
 vanilla JavaScript in a single commit. The popup scrapes colors from the active tab via
 `chrome.scripting.executeScript`, sends them to Google Gemini with a large prompt, streams the
 response back, and extracts `:root` / `.dark` blocks of shadcn/Tailwind CSS variables. A hand-written
-bundler (`build.js`) concatenates seven source files into `dist/popup.js` in a fixed order.
+bundler (`build.js`) concatenates seven source files into `extension-build/popup.js` in a fixed order.
 
 **What the audit found:** the extension works for the happy path, but it ships a
 privilege-escalating XSS in the popup, injects a completely dead content script into every page the
@@ -44,10 +44,10 @@ npm run verify                        # build + lint + test
 # then: chrome://extensions → Developer mode → Reload → open the popup
 ```
 
-`npm run build` on its own only regenerates `dist/popup.js`; it runs no checks.
+`npm run build` on its own only regenerates `extension-build/popup.js`; it runs no checks.
 
-`dist/popup.js` is a committed build artifact. **Editing `src/` without re-running `node build.js`
-changes nothing at runtime** — the popup loads `dist/popup.js`, not the sources. Re-run the build and
+`extension-build/popup.js` is a committed build artifact. **Editing `src/` without re-running `node build.js`
+changes nothing at runtime** — the popup loads `extension-build/popup.js`, not the sources. Re-run the build and
 commit the result with every change.
 
 ---
@@ -195,9 +195,9 @@ without a visible freeze; a stalled request times out with a clear message inste
 > something short of manually clicking through the popup.
 
 - [x] 🟡 **Add a `.gitignore`.** The repository has none.
-- [x] 🟡 **Decide and document the `dist/` policy.** `dist/popup.js` is committed, and it **must
+- [x] 🟡 **Decide and document the `extension-build/` policy.** `extension-build/popup.js` is committed, and it **must
       remain committed** — `Load unpacked` has to work from a clean clone, and `src/popup/popup.html:184`
-      loads `../../dist/popup.js` directly. The risk is drift: an edit to `src/` that is not rebuilt
+      loads `../../extension-build/popup.js` directly. The risk is drift: an edit to `src/` that is not rebuilt
       silently does nothing. Add a build check that fails when the committed bundle does not match a
       fresh build of `src/`.
 - [x] 🟡 **Add a `package.json`** with `build`, `lint`, and `test` scripts, so the project has a
@@ -215,14 +215,14 @@ without a visible freeze; a stalled request times out with a clear message inste
   - [x] `toHex` (`src/shared/utils.js:62`) against a stubbed canvas context, including the CSP
         fallback path at `:73`.
 - [x] 🟡 **Add CI** at `.github/workflows/ci.yml` — the repo has no `.github/` directory. Run build,
-      lint, and test on push and PR, and assert the committed `dist/popup.js` matches a fresh build.
+      lint, and test on push and PR, and assert the committed `extension-build/popup.js` matches a fresh build.
 - [x] 🟢 **Note the ES-module migration path.** `build.js:18-26` depends on a hand-maintained file
       order, and every module communicates through mutable globals declared in `src/popup/state.js`.
       Moving to real ES modules with `type="module"` in `popup.html` would remove the custom bundler
       entirely. Record it as a follow-up; do not block this phase on it.
 
 **Exit criteria:** `npm run build && npm run lint && npm test` passes locally and in CI, and CI fails
-when `dist/` is stale.
+when `extension-build/` is stale.
 
 ---
 
@@ -337,7 +337,7 @@ no single click can destroy a saved key.
 | 19 | Hand-rolled JSON stream parser; no `alt=sse` | `src/popup/generator.js` | 171, 196-238 | 🟡 Medium | 3 |
 | 20 | No fetch timeout or cancellation | `src/popup/generator.js` | 171 | 🟡 Medium | 3 |
 | 21 | No retry on 429/503 | `src/popup/generator.js` | 177 | 🟢 Low | 3 |
-| 22 | No `.gitignore`; `dist/` drift undetected | repo root | — | 🟡 Medium | 4 |
+| 22 | No `.gitignore`; `extension-build/` drift undetected | repo root | — | 🟡 Medium | 4 |
 | 23 | No `package.json`, linter, or formatter | repo root | — | 🟡 Medium | 4 |
 | 24 | Zero tests | repo root | — | 🟡 Medium | 4 |
 | 25 | No CI | `.github/` | — | 🟡 Medium | 4 |

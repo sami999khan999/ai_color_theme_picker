@@ -5,7 +5,7 @@
   "description": "Chrome extension that analyses a page's colours and generates Tailwind/shadcn CSS variables with Gemini.",
   "scripts": {
     "build": "node build.js",
-    "check:dist": "node scripts/check-dist.js",
+    "check:build": "node scripts/check-build.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

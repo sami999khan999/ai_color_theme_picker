@@ -4,8 +4,8 @@ npm-debug.log*
 *.zip
 .eslintcache
 
-# dist/popup.js is intentionally committed: popup.html loads it directly, so
-# `Load unpacked` has to work from a clean clone. `npm run check:dist` guards
+# extension-build/popup.js is intentionally committed: popup.html loads it directly, so
+# `Load unpacked` has to work from a clean clone. `npm run check:build` guards
 # against it drifting from src/.
 
 # Personal, machine-local Claude Code overrides (permission grants and the

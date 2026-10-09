@@ -2,15 +2,15 @@
 
 ## Build before you believe anything
 
-`src/popup/popup.html` loads `../../dist/popup.js`. The files under `src/` are
+`src/popup/popup.html` loads `../../extension-build/popup.js`. The files under `src/` are
 **not** loaded at runtime. Any change to `src/` requires:
 
 ```bash
 node build.js      # or: npm run build
 ```
 
-and the regenerated `dist/popup.js` must be committed with the change. `npm run
-check:dist` and a test both fail if it drifts. This is the single most common way
+and the regenerated `extension-build/popup.js` must be committed with the change. `npm run
+check:build` and a test both fail if it drifts. This is the single most common way
 to make a change that appears to do nothing.
 
 ## Architecture in one paragraph

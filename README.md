@@ -61,19 +61,19 @@ No runtime dependencies. Plain browser JavaScript, hand-written CSS, inline SVG.
   `api-keys.js` (key storage and the saved-key list), `generator.js` (prompt
   construction, the Gemini request, stream parsing), and `init.js` (bootstrap
   and event wiring).
-- **`dist/popup.js`** — the generated bundle that `popup.html` actually loads.
+- **`extension-build/popup.js`** — the generated bundle that `popup.html` actually loads.
 - **`test/`** — `node:test` suites for the pure logic.
 
 ### Build
 
 `build.js` concatenates the seven source files, in dependency order, into
-`dist/popup.js`. There is no transpiling, minification, or module system: the
+`extension-build/popup.js`. There is no transpiling, minification, or module system: the
 files share a single global scope, which is why the order in `JS_FILES` matters.
 
 The build is deterministic — the same sources always produce a byte-identical
 bundle — so CI can verify that the committed bundle matches `src/`.
 
-> **`dist/popup.js` is committed on purpose.** `popup.html` loads it directly, so
+> **`extension-build/popup.js` is committed on purpose.** `popup.html` loads it directly, so
 > `Load unpacked` has to work from a clean clone. The consequence is that
 > **editing `src/` without rebuilding changes nothing at runtime.** Always run
 > `npm run build` and commit the result.
@@ -99,10 +99,10 @@ the extension card.
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Rebuild `dist/popup.js` from `src/`. |
+| `npm run build` | Rebuild `extension-build/popup.js` from `src/`. |
 | `npm test` | Run the `node:test` suites. |
 | `npm run lint` | Run ESLint over sources, the bundle, and tooling. |
-| `npm run check:dist` | Fail if the committed bundle is stale. |
+| `npm run check:build` | Fail if the committed bundle is stale. |
 | `npm run verify` | Build, lint, and test in one go. |
 | `npm run format` | Apply Prettier. |
 

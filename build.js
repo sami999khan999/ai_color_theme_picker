@@ -1,22 +1,22 @@
 /**
  * Build Script for AI Color Theme Picker
  *
- * Concatenates all JS source files from src/ into dist/popup.js
+ * Concatenates all JS source files from src/ into extension-build/popup.js
  * in the correct dependency order.
  *
  * Usage: node build.js
  *
  * The output is deterministic: the same sources always produce a byte-identical
- * bundle. That is what lets `npm run check:dist` catch a dist/ that was not
+ * bundle. That is what lets `npm run check:build` catch an extension-build/ that was not
  * rebuilt after a src/ change — a real hazard here, because popup.html loads
- * dist/popup.js, so editing src/ alone changes nothing at runtime.
+ * extension-build/popup.js, so editing src/ alone changes nothing at runtime.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const SRC_DIR = path.join(__dirname, 'src');
-const DIST_DIR = path.join(__dirname, 'dist');
+const DIST_DIR = path.join(__dirname, 'extension-build');
 const OUTPUT_FILE = path.join(DIST_DIR, 'popup.js');
 
 // Files in dependency order
@@ -60,7 +60,7 @@ const writeBundle = () => {
     const output = buildBundle();
     fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
 
-    console.log('\n✅ Build complete: dist/popup.js');
+    console.log('\n✅ Build complete: extension-build/popup.js');
     console.log(`   Size: ${(Buffer.byteLength(output) / 1024).toFixed(1)} KB`);
     console.log(`   Files: ${JS_FILES.length} source files concatenated\n`);
 };

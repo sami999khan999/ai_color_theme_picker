@@ -11,14 +11,14 @@ test('the bundle is deterministic', () => {
     assert.equal(buildBundle(), buildBundle());
 });
 
-test('dist/popup.js matches a fresh build of src/', () => {
-    // popup.html loads dist/popup.js, so a stale bundle means src/ edits have no
+test('extension-build/popup.js matches a fresh build of src/', () => {
+    // popup.html loads extension-build/popup.js, so a stale bundle means src/ edits have no
     // effect at runtime.
-    assert.ok(fs.existsSync(OUTPUT_FILE), 'dist/popup.js is missing — run `node build.js`');
+    assert.ok(fs.existsSync(OUTPUT_FILE), 'extension-build/popup.js is missing — run `node build.js`');
     assert.equal(
         fs.readFileSync(OUTPUT_FILE, 'utf-8'),
         buildBundle(),
-        'dist/popup.js is stale — run `node build.js` and commit the result'
+        'extension-build/popup.js is stale — run `node build.js` and commit the result'
     );
 });
 
