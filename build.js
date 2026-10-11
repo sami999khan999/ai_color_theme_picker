@@ -1,23 +1,23 @@
 /**
  * Build Script for AI Color Theme Picker
  *
- * Concatenates all JS source files from src/ into extension-build/popup.js
+ * Concatenates all JS source files from src/ into release/popup.js
  * in the correct dependency order, and copies the manifest, popup page and icon
- * beside it: extension-build/ is the whole extension, the folder Load unpacked selects.
+ * beside it: release/ is the whole extension, the folder Load unpacked selects.
  *
  * Usage: node build.js
  *
  * The output is deterministic: the same sources always produce byte-identical
- * files. That is what lets `npm run check:build` catch an extension-build/ that was not
+ * files. That is what lets `npm run check:build` catch an release/ that was not
  * rebuilt after a src/ change — a real hazard here, because the extension runs
- * from extension-build/, so editing src/ alone changes nothing at runtime.
+ * from release/, so editing src/ alone changes nothing at runtime.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const SRC_DIR = path.join(__dirname, 'src');
-const DIST_DIR = path.join(__dirname, 'extension-build');
+const DIST_DIR = path.join(__dirname, 'release');
 const OUTPUT_FILE = path.join(DIST_DIR, 'popup.js');
 
 // Files in dependency order
@@ -53,8 +53,8 @@ const buildBundle = () => {
     return output;
 };
 
-// Copied unchanged: extension-build/ path → source path. The manifest's paths are
-// relative to extension-build/.
+// Copied unchanged: release/ path → source path. The manifest's paths are
+// relative to release/.
 const COPIED_FILES = {
     'manifest.json': 'src/manifest.json',
     'popup.html': 'src/popup/popup.html',
@@ -62,7 +62,7 @@ const COPIED_FILES = {
     'icons/icon.png': 'icons/icon.png',
 };
 
-// Every file of extension-build/, as { relative path: Buffer }.
+// Every file of release/, as { relative path: Buffer }.
 const buildFiles = () => {
     const files = { 'popup.js': Buffer.from(buildBundle(), 'utf-8') };
     for (const [out, src] of Object.entries(COPIED_FILES)) {
@@ -79,7 +79,7 @@ const writeBundle = () => {
         fs.writeFileSync(outPath, content);
     }
 
-    console.log('\n✅ Build complete: extension-build/');
+    console.log('\n✅ Build complete: release/');
     console.log(`   popup.js: ${(files['popup.js'].length / 1024).toFixed(1)} KB, ${JS_FILES.length} source files concatenated`);
     console.log(`   Copied: ${Object.keys(COPIED_FILES).join(', ')}\n`);
 };

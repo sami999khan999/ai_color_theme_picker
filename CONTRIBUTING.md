@@ -9,14 +9,14 @@ npm run verify   # build + lint + test
 
 ## The one thing that will catch you out
 
-The extension runs from `extension-build/`, **not** from the files in `src/`. Editing a source
+The extension runs from `release/`, **not** from the files in `src/`. Editing a source
 file and reloading the extension does nothing until you rebuild:
 
 ```bash
 npm run build
 ```
 
-`extension-build/` (the whole extension) is committed deliberately, so `Load unpacked` works
+`release/` (the whole extension) is committed deliberately, so `Load unpacked` works
 from a clean clone. Commit the rebuild alongside your source change — CI fails if the
 two disagree (`npm run check:build`).
 
@@ -30,7 +30,7 @@ declared in `state.js` is visible to `generator.js`. Two consequences:
   it, at call time.
 - **Linting is split.** `no-undef`, `no-unused-vars` and `prefer-const` can only
   be judged across the whole concatenated program, so ESLint applies them to
-  `extension-build/popup.js`. `src/**` gets the rules that are meaningful per-file. See
+  `release/popup.js`. `src/**` gets the rules that are meaningful per-file. See
   `eslint.config.js`.
 
 ## Tests

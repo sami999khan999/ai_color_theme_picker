@@ -4,7 +4,7 @@
 // single file, so they share one global scope: a const declared in state.js is
 // legitimately referenced from generator.js. That makes the *bundle*, not the
 // individual source file, the only unit where no-undef can be evaluated
-// correctly — so no-undef runs against extension-build/popup.js and is off for src/.
+// correctly — so no-undef runs against release/popup.js and is off for src/.
 
 const browserGlobals = {
     window: 'readonly',
@@ -64,7 +64,7 @@ module.exports = [
     },
     {
         // The bundle: the one place cross-file references actually resolve.
-        files: ['extension-build/popup.js'],
+        files: ['release/popup.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType: 'script',

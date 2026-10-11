@@ -1,5 +1,5 @@
 /**
- * Fails when extension-build/ does not match a fresh build of src/.
+ * Fails when release/ does not match a fresh build of src/.
  *
  * The build has to stay committed for `Load unpacked` to work from a clean
  * clone, which means it can silently drift from the sources it was built from.
@@ -14,7 +14,7 @@ const stale = Object.entries(buildFiles())
         const outPath = path.join(DIST_DIR, out);
         return !fs.existsSync(outPath) || !fs.readFileSync(outPath).equals(content);
     })
-    .map(([out]) => `extension-build/${out}`);
+    .map(([out]) => `release/${out}`);
 
 if (stale.length) {
     console.error(`Missing or stale: ${stale.join(', ')}. It does not match a fresh build of src/.`);
@@ -22,4 +22,4 @@ if (stale.length) {
     process.exit(1);
 }
 
-console.log('extension-build/ is up to date with src/.');
+console.log('release/ is up to date with src/.');

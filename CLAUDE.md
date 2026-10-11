@@ -2,7 +2,7 @@
 
 ## Build before you believe anything
 
-The extension runs from `extension-build/` (manifest, `popup.html`, `popup.js`, icon), the
+The extension runs from `release/` (manifest, `popup.html`, `popup.js`, icon), the
 folder Load unpacked selects. The files under `src/` are **not** loaded at runtime. Any
 change to `src/` requires:
 
@@ -10,7 +10,7 @@ change to `src/` requires:
 node build.js      # or: npm run build
 ```
 
-and the regenerated `extension-build/` must be committed with the change. `npm run
+and the regenerated `release/` must be committed with the change. `npm run
 check:build` and a test both fail if it drifts. This is the single most common way
 to make a change that appears to do nothing.
 

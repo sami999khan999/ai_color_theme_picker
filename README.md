@@ -61,20 +61,20 @@ No runtime dependencies. Plain browser JavaScript, hand-written CSS, inline SVG.
   `api-keys.js` (key storage and the saved-key list), `generator.js` (prompt
   construction, the Gemini request, stream parsing), and `init.js` (bootstrap
   and event wiring).
-- **`extension-build/`** — the built extension that Chrome loads: the generated `popup.js`
+- **`release/`** — the built extension that Chrome loads: the generated `popup.js`
   bundle, plus the manifest (`src/manifest.json`), popup page and icon copied beside it.
 - **`test/`** — `node:test` suites for the pure logic.
 
 ### Build
 
 `build.js` concatenates the seven source files, in dependency order, into
-`extension-build/popup.js`. There is no transpiling, minification, or module system: the
+`release/popup.js`. There is no transpiling, minification, or module system: the
 files share a single global scope, which is why the order in `JS_FILES` matters.
 
 The build is deterministic — the same sources always produce a byte-identical
 bundle — so CI can verify that the committed bundle matches `src/`.
 
-> **`extension-build/` is committed on purpose.** It is the whole extension, so
+> **`release/` is committed on purpose.** It is the whole extension, so
 > `Load unpacked` works from a clean clone on any device, without building. The consequence is that
 > **editing `src/` without rebuilding changes nothing at runtime.** Always run
 > `npm run build` and commit the result.
@@ -91,7 +91,7 @@ bundle — so CI can verify that the committed bundle matches `src/`.
    ```
 3. Open `chrome://extensions`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the `extension-build/` folder.
+5. Click **Load unpacked** and select the `release/` folder.
 
 After any change under `src/`, run `npm run build` again and hit **Reload** on
 the extension card.
@@ -100,7 +100,7 @@ the extension card.
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Rebuild `extension-build/` from `src/`. |
+| `npm run build` | Rebuild `release/` from `src/`. |
 | `npm test` | Run the `node:test` suites. |
 | `npm run lint` | Run ESLint over sources, the bundle, and tooling. |
 | `npm run check:build` | Fail if the committed build is stale. |

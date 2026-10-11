@@ -12,15 +12,15 @@ test('the bundle is deterministic', () => {
     assert.equal(buildBundle(), buildBundle());
 });
 
-test('extension-build/ matches a fresh build of src/', () => {
-    // The extension runs from extension-build/, so a stale file there means src/ edits
+test('release/ matches a fresh build of src/', () => {
+    // The extension runs from release/, so a stale file there means src/ edits
     // have no effect at runtime.
     for (const [out, content] of Object.entries(buildFiles())) {
         const outPath = path.join(DIST_DIR, out);
-        assert.ok(fs.existsSync(outPath), `extension-build/${out} is missing — run \`node build.js\``);
+        assert.ok(fs.existsSync(outPath), `release/${out} is missing — run \`node build.js\``);
         assert.ok(
             fs.readFileSync(outPath).equals(content),
-            `extension-build/${out} is stale — run \`node build.js\` and commit the result`
+            `release/${out} is stale — run \`node build.js\` and commit the result`
         );
     }
 });
