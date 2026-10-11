@@ -61,7 +61,8 @@ No runtime dependencies. Plain browser JavaScript, hand-written CSS, inline SVG.
   `api-keys.js` (key storage and the saved-key list), `generator.js` (prompt
   construction, the Gemini request, stream parsing), and `init.js` (bootstrap
   and event wiring).
-- **`extension-build/popup.js`** — the generated bundle that `popup.html` actually loads.
+- **`extension-build/`** — the built extension that Chrome loads: the generated `popup.js`
+  bundle, plus the manifest (`src/manifest.json`), popup page and icon copied beside it.
 - **`test/`** — `node:test` suites for the pure logic.
 
 ### Build
@@ -73,8 +74,8 @@ files share a single global scope, which is why the order in `JS_FILES` matters.
 The build is deterministic — the same sources always produce a byte-identical
 bundle — so CI can verify that the committed bundle matches `src/`.
 
-> **`extension-build/popup.js` is committed on purpose.** `popup.html` loads it directly, so
-> `Load unpacked` has to work from a clean clone. The consequence is that
+> **`extension-build/` is committed on purpose.** It is the whole extension, so
+> `Load unpacked` works from a clean clone on any device, without building. The consequence is that
 > **editing `src/` without rebuilding changes nothing at runtime.** Always run
 > `npm run build` and commit the result.
 
@@ -90,7 +91,7 @@ bundle — so CI can verify that the committed bundle matches `src/`.
    ```
 3. Open `chrome://extensions`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the project root.
+5. Click **Load unpacked** and select the `extension-build/` folder.
 
 After any change under `src/`, run `npm run build` again and hit **Reload** on
 the extension card.
@@ -99,10 +100,10 @@ the extension card.
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Rebuild `extension-build/popup.js` from `src/`. |
+| `npm run build` | Rebuild `extension-build/` from `src/`. |
 | `npm test` | Run the `node:test` suites. |
 | `npm run lint` | Run ESLint over sources, the bundle, and tooling. |
-| `npm run check:build` | Fail if the committed bundle is stale. |
+| `npm run check:build` | Fail if the committed build is stale. |
 | `npm run verify` | Build, lint, and test in one go. |
 | `npm run format` | Apply Prettier. |
 

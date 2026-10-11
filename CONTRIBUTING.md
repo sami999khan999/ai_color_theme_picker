@@ -9,15 +9,15 @@ npm run verify   # build + lint + test
 
 ## The one thing that will catch you out
 
-`popup.html` loads `extension-build/popup.js`, **not** the files in `src/`. Editing a source
+The extension runs from `extension-build/`, **not** from the files in `src/`. Editing a source
 file and reloading the extension does nothing until you rebuild:
 
 ```bash
 npm run build
 ```
 
-`extension-build/popup.js` is committed deliberately, so `Load unpacked` works from a clean
-clone. Commit the rebuilt bundle alongside your source change — CI fails if the
+`extension-build/` (the whole extension) is committed deliberately, so `Load unpacked` works
+from a clean clone. Commit the rebuild alongside your source change — CI fails if the
 two disagree (`npm run check:build`).
 
 ## How the code is organised

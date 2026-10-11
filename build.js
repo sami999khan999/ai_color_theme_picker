@@ -2,14 +2,15 @@
  * Build Script for AI Color Theme Picker
  *
  * Concatenates all JS source files from src/ into extension-build/popup.js
- * in the correct dependency order.
+ * in the correct dependency order, and copies the manifest, popup page and icon
+ * beside it: extension-build/ is the whole extension, the folder Load unpacked selects.
  *
  * Usage: node build.js
  *
- * The output is deterministic: the same sources always produce a byte-identical
- * bundle. That is what lets `npm run check:build` catch an extension-build/ that was not
- * rebuilt after a src/ change — a real hazard here, because popup.html loads
- * extension-build/popup.js, so editing src/ alone changes nothing at runtime.
+ * The output is deterministic: the same sources always produce byte-identical
+ * files. That is what lets `npm run check:build` catch an extension-build/ that was not
+ * rebuilt after a src/ change — a real hazard here, because the extension runs
+ * from extension-build/, so editing src/ alone changes nothing at runtime.
  */
 
 const fs = require('fs');
@@ -52,20 +53,38 @@ const buildBundle = () => {
     return output;
 };
 
-const writeBundle = () => {
-    if (!fs.existsSync(DIST_DIR)) {
-        fs.mkdirSync(DIST_DIR, { recursive: true });
-    }
-
-    const output = buildBundle();
-    fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
-
-    console.log('\n✅ Build complete: extension-build/popup.js');
-    console.log(`   Size: ${(Buffer.byteLength(output) / 1024).toFixed(1)} KB`);
-    console.log(`   Files: ${JS_FILES.length} source files concatenated\n`);
+// Copied unchanged: extension-build/ path → source path. The manifest's paths are
+// relative to extension-build/.
+const COPIED_FILES = {
+    'manifest.json': 'src/manifest.json',
+    'popup.html': 'src/popup/popup.html',
+    'popup.css': 'src/popup/popup.css',
+    'icons/icon.png': 'icons/icon.png',
 };
 
-module.exports = { JS_FILES, OUTPUT_FILE, buildBundle };
+// Every file of extension-build/, as { relative path: Buffer }.
+const buildFiles = () => {
+    const files = { 'popup.js': Buffer.from(buildBundle(), 'utf-8') };
+    for (const [out, src] of Object.entries(COPIED_FILES)) {
+        files[out] = fs.readFileSync(path.join(__dirname, src));
+    }
+    return files;
+};
+
+const writeBundle = () => {
+    const files = buildFiles();
+    for (const [out, content] of Object.entries(files)) {
+        const outPath = path.join(DIST_DIR, out);
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.writeFileSync(outPath, content);
+    }
+
+    console.log('\n✅ Build complete: extension-build/');
+    console.log(`   popup.js: ${(files['popup.js'].length / 1024).toFixed(1)} KB, ${JS_FILES.length} source files concatenated`);
+    console.log(`   Copied: ${Object.keys(COPIED_FILES).join(', ')}\n`);
+};
+
+module.exports = { JS_FILES, OUTPUT_FILE, DIST_DIR, buildBundle, buildFiles };
 
 if (require.main === module) {
     try {

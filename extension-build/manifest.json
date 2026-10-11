@@ -4,7 +4,7 @@
   "version": "1.0",
   "description": "Pick theme colors and generate Tailwind CSS variables for light and dark modes.",
   "action": {
-    "default_popup": "src/popup/popup.html",
+    "default_popup": "popup.html",
     "default_icon": "icons/icon.png"
   },
   "icons": {
